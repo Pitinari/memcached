@@ -1,3 +1,6 @@
+#ifndef __QUEUE_H__
+#define __QUEUE_H__
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -10,14 +13,16 @@ struct Queue {
     struct QNode *front, *rear;
 };
 
-struct QNode* newNode(void *k);
+struct QNode* new_node(void *k);
 
-struct Queue* createQueue();
+struct Queue* create_queue();
 
-void enQueue(struct Queue* q, void *k);
+void push_queue(struct Queue* q, void *k);
 
-void *deQueue(struct Queue* q);
+void *pop_queue(struct Queue* q);
 
-int emptyQueue(struct Queue* q);
+int empty_queue(struct Queue* q);
 
-void *firstQueue(struct Queue* q);
+void *first_queue(struct Queue* q);
+
+#endif /* __QUEUE_H__ */
