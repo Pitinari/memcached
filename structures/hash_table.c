@@ -48,7 +48,7 @@ void hashtable_destroy(HashTable table) {
   // Destruir cada uno de los datos.
   for (unsigned idx = 0; idx < table->size; ++idx)
     if (table->elems[idx].data != NULL){
-      table->destr(table->elems[idx].data);
+      table->destr(table->elems[idx]);
     }
   // Liberar el arreglo de casillas y la tabla.
   free(table->elems);

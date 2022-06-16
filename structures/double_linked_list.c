@@ -93,3 +93,19 @@ void dll_node_delete(DoubleLinkedList dll, void *key, void *data, ComparativeFun
     }
     return;
 }
+
+void dll_destroy(DoubleLinkedList dll, DestructiveFunctionDLL destr){
+    NodeDLL node = dll->front;
+    while(node){
+        destr(node->data);
+        if(node->next){
+            node = node->next;
+            free(node->back);
+        }
+        else{
+            free(node);
+            node = NULL;
+        }
+    }
+    free(dll);
+}

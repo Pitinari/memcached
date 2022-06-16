@@ -36,4 +36,6 @@ void dll_insert(DoubleLinkedList dll, void *key, void *data, ComparativeFunction
 
 void dll_node_delete(DoubleLinkedList dll, void *key, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr);
 
+void dll_destroy(DoubleLinkedList dll, DestructiveFunctionDLL destr);
+
 #endif /* __DOUBLELINKEDLIST_H__ */
