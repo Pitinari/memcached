@@ -2,6 +2,7 @@
 #define __HASHTABLE_H__
 
 #include <stdbool.h>
+#include "double_linked_list.h"
 
 typedef void *(*CopyFunction)(void *data);
 /** Retorna una copia fisica del dato */
@@ -14,18 +15,10 @@ typedef unsigned (*HashFunction)(void *data, unsigned numCollisions);
 /** Retorna un entero sin signo para el dato */
 
 /**
- * Casillas en la que almacenaremos los datos de la tabla hash.
- */
-struct HashNode{
-  void *data;
-  bool eliminated;
-};
-
-/**
  * Estructura principal que representa la tabla hash.
  */
 struct _HashTable {
-  struct HashNode *elems;
+  struct DoubleLinkedList *elems;
   unsigned numElems;
   unsigned size;
   CopyFunction copy;

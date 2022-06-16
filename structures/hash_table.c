@@ -14,7 +14,7 @@ HashTable create_hashtable(unsigned size, ComparativeFunction comp,
 
   // Pedimos memoria para la estructura principal y las casillas.
   HashTable table = malloc(sizeof(struct _HashTable));
-  table->elems = malloc(sizeof(struct HashNode) * size);
+  table->elems = malloc(sizeof(struct DoubleLinkedList) * size);
   table->numElems = 0;
   table->size = size;
   table->copy = copy;
@@ -24,8 +24,7 @@ HashTable create_hashtable(unsigned size, ComparativeFunction comp,
 
   // Inicializamos las casillas con datos nulos.
   for (unsigned idx = 0; idx < size; ++idx) {
-    table->elems[idx].data = NULL;
-    table->elems[idx].eliminated = false;
+    table->elems[idx] = dll_create();
   }
 
   return table;
