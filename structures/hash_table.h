@@ -4,14 +4,13 @@
 #include <stdbool.h>
 #include "double_linked_list.h"
 
-typedef void *(*CopyFunction)(void *data);
 /** Retorna una copia fisica del dato */
 typedef bool (*ComparativeFunction)(void *data1, void *data2);
 /** Retorna un booleano que es true si los datos son iguales y false en caso
 contrario */
 typedef void (*DestructiveFunction)(void *data);
 /** Libera la memoria alocada para el dato */
-typedef unsigned (*HashFunction)(void *data, unsigned numCollisions);
+typedef unsigned (*HashFunction)(void *data);
 /** Retorna un entero sin signo para el dato */
 
 /**
@@ -21,7 +20,6 @@ struct _HashTable {
   struct DoubleLinkedList *elems;
   unsigned numElems;
   unsigned size;
-  CopyFunction copy;
   ComparativeFunction comp;
   DestructiveFunction destr;
   HashFunction hash;
@@ -66,7 +64,5 @@ void *hashtable_search(HashTable table, void *data);
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
 void hashtable_delete(HashTable table, void *data);
-
-void *hashtable_to_list (HashTable table);
 
 #endif /* __HASHTABLE_H__ */

@@ -54,10 +54,10 @@ void* dll_search(DoubleLinkedList dll, void *key, ComparativeFunctionDLL comp){
     return NULL;
 }
 
-void dll_insert(DoubleLinkedList dll, void *key, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr){
+void dll_insert(DoubleLinkedList dll, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr){
     NodeDLL node = dll->front;
     while(node){
-        if(comp(node->data, key)){
+        if(comp(node->data, data)){
             destr(node->data);
             node->data = data;
             return;
@@ -70,10 +70,10 @@ void dll_insert(DoubleLinkedList dll, void *key, void *data, ComparativeFunction
     return;
 }
 
-void dll_node_delete(DoubleLinkedList dll, void *key, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr){
+void dll_node_delete(DoubleLinkedList dll, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr){
     NodeDLL node = dll->front;
     while(node){
-        if(comp(node->data, key)){
+        if(comp(node->data, data)){
             destr(node->data);
             if(node->back == NULL){
                 dll->front = node->next;

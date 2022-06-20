@@ -32,9 +32,9 @@ void* dll_pop(DoubleLinkedList dll);
 
 void* dll_search(DoubleLinkedList dll, void *key, ComparativeFunctionDLL comp);
 
-void dll_insert(DoubleLinkedList dll, void *key, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr);
+void dll_insert(DoubleLinkedList dll, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr);
 
-void dll_node_delete(DoubleLinkedList dll, void *key, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr);
+void dll_node_delete(DoubleLinkedList dll, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr);
 
 void dll_destroy(DoubleLinkedList dll, DestructiveFunctionDLL destr);
 
