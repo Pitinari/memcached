@@ -10,19 +10,16 @@ typedef bool (*ComparativeFunction)(void *data1, void *data2);
 contrario */
 typedef void (*DestructiveFunction)(void *data);
 /** Libera la memoria alocada para el dato */
-typedef unsigned (*HashFunction)(void *data);
-/** Retorna un entero sin signo para el dato */
 
 /**
  * Estructura principal que representa la tabla hash.
  */
 struct _HashTable {
-  struct DoubleLinkedList *elems;
+  struct NodeDLL *elems;
   unsigned numElems;
   unsigned size;
   ComparativeFunction comp;
   DestructiveFunction destr;
-  HashFunction hash;
 };
 
 typedef struct _HashTable *HashTable;
@@ -52,17 +49,17 @@ void hashtable_destroy(HashTable table);
 /**
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
-void hashtable_insert(HashTable table, void *data);
+void hashtable_insert(HashTable table, unsigned hashedValue, void *data);
 
 /**
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
  * buscado no se encuentra en la tabla.
  */
-void *hashtable_search(HashTable table, void *data);
+void *hashtable_search(HashTable table, unsigned hashedValue, void *data);
 
 /**
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void hashtable_delete(HashTable table, void *data);
+void hashtable_delete(HashTable table, unsigned hashedValue, void *data);
 
 #endif /* __HASHTABLE_H__ */

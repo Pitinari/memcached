@@ -9,20 +9,19 @@
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
 HashTable create_hashtable(unsigned size, ComparativeFunction comp,
-                         DestructiveFunction destr, HashFunction hash) {
+                         DestructiveFunction destr) {
 
   // Pedimos memoria para la estructura principal y las casillas.
   HashTable table = malloc(sizeof(struct _HashTable));
-  table->elems = malloc(sizeof(struct _DoubleLinkedList) * size);
+  table->elems = malloc(sizeof(NodeDLL) * size);
   table->numElems = 0;
   table->size = size;
   table->comp = comp;
   table->destr = destr;
-  table->hash = hash;
 
   // Inicializamos las casillas con datos nulos.
   for (unsigned idx = 0; idx < size; ++idx) {
-    table->elems[idx] = dll_create();
+    table->elems[idx] = node_dll_create(NULL);
   }
 
   return table;
@@ -42,12 +41,22 @@ unsigned hashtable_capacity(HashTable table) { return table->size; }
  * Destruye la tabla.
  */
 void hashtable_destroy(HashTable table) {
-
+  NodeDLL node, aux;
   // Destruir cada uno de los datos.
-  for (unsigned idx = 0; idx < table->size; ++idx)
-    if (table->elems[idx].data != NULL){
-      table->destr(table->elems[idx]);
+  for (unsigned idx = 0; idx < table->size; ++idx){
+    node = table->elems[idx];
+    if(node->data == NULL){
+      free(node);
+      break;
     }
+    while (node){
+      table->destr(node->data);
+      aux = node;
+      node = node->next;
+      free(aux);
+    }
+    
+  }
   // Liberar el arreglo de casillas y la tabla.
   free(table->elems);
   free(table);
@@ -58,10 +67,20 @@ void hashtable_destroy(HashTable table) {
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
  * buscado no se encuentra en la tabla.
  */
-void *hashtable_search(HashTable table, void *data) {
+void *hashtable_search(HashTable table, unsigned hashedValue, void *data) {
   // Calculamos la posicion del dato dado, de acuerdo a la funcion hash.
-  unsigned idx = table->hash(data) % table->size;
-  return dll_search(table->elems[idx], table->comp);
+  unsigned idx = hashedValue % table->size;
+  NodeDLL node = table->elems[idx];
+  if(node->data == NULL){
+    return NULL;
+  }
+  while(node){
+    if(table->comp(node->data, data)){
+      return node->data;
+    }
+    node = node->next;
+  }
+  return NULL;
 }
 
 /*
@@ -87,7 +106,7 @@ unsigned i,j;
  * tablahash_insertar: TablaHash *void -> void
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
-void hashtable_insert(HashTable table, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr) {
+void hashtable_insert(HashTable table, unsigned hashedValue, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr) {
 
   //agranda la tabla si tiene un 70% ocupado
   /*
@@ -97,7 +116,7 @@ void hashtable_insert(HashTable table, void *data, ComparativeFunctionDLL comp, 
   */
 
   // Calculamos la posicion del dato dado, de acuerdo a la funcion hash.
-  unsigned idx = table->hash(data) % table->size;
+  unsigned idx = hashedValue % table->size;
 
   dll_insert(table->elems[idx], data, comp, destr);
   table->numElems++;
@@ -107,10 +126,10 @@ void hashtable_insert(HashTable table, void *data, ComparativeFunctionDLL comp, 
  * tablahash_eliminar: TablaHash *void -> void
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void hashtable_delete(HashTable table, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr) {
+void hashtable_delete(HashTable table, unsigned hashedValue, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr) {
 
   // Calculamos la posicion del dato dado, de acuerdo a la funcion hash.
-  unsigned idx = table->hash(data) % table->size;
+  unsigned idx = hashedValue % table->size;
 
   void dll_node_delete(table->elems[idx], data, comp, destr);
 
