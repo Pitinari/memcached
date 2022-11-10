@@ -17,7 +17,7 @@ typedef void *(*AlloccateFunction)(size_t size);
  * Estructura principal que representa la tabla hash.
  */
 struct _HashTable {
-  struct DoubleLinkedList *elems;
+  struct NodeDLL *elems;
   unsigned numElems;
   unsigned size;
   ComparativeFunction comp;

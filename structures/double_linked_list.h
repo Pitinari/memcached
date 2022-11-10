@@ -1,12 +1,13 @@
 #ifndef __DOUBLELINKEDLIST_H__
 #define __DOUBLELINKEDLIST_H__
 
+#include <stdbool.h>
 #include <stdlib.h>
 
-typedef bool (*ComparativeFunctionDLL)(void *data1, void *data2);
+typedef bool (*ComparativeFunctionDLL) (void *data1, void *data2);
 /** Retorna un booleano que es true si los datos son iguales y false en caso
 contrario */
-typedef void (*DestructiveFunctionDLL)(void *data);
+typedef void (*DestructiveFunctionDLL) (void *data);
 /** Libera la memoria alocada para el dato */
 typedef void *(*AlloccateFunctionDLL)(size_t size);
 /** malloc personalizado */
@@ -14,7 +15,7 @@ typedef void *(*AlloccateFunctionDLL)(size_t size);
 struct _NodeDLL {
     struct _Node *back, *next;
     void *data;
-}
+};
 
 typedef struct _NodeDLL *NodeDLL;
 

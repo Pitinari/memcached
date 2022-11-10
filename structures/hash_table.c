@@ -42,12 +42,22 @@ unsigned hashtable_size(HashTable table) { return table->size; }
  * Destruye la tabla.
  */
 void hashtable_destroy(HashTable table) {
-
+  NodeDLL node, aux;
   // Destruir cada uno de los datos.
-  for (unsigned idx = 0; idx < table->size; ++idx)
-    if (table->elems[idx].data != NULL){
-      table->destr(table->elems[idx]);
+  for (unsigned idx = 0; idx < table->size; ++idx){
+    node = table->elems[idx];
+    if(node->data == NULL){
+      free(node);
+      break;
     }
+    while (node){
+      table->destr(node->data);
+      aux = node;
+      node = node->next;
+      free(aux);
+    }
+    
+  }
   // Liberar el arreglo de casillas y la tabla.
   free(table->elems);
   free(table);

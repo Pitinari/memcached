@@ -1,4 +1,4 @@
-#include "double_linked_list"
+#include "double_linked_list.h"
 
 NodeDLL node_dll_create(void *data, AllocationFunction custom_malloc){
     NodeDLL node = (NodeDLL) custom_malloc(sizeof(struct _NodeDLL));
@@ -23,8 +23,8 @@ void dll_push(DoubleLinkedList dll, void *data){
         dll->rear = dll->front;
         return;
     }
-    dll->front->next = temp;    // Nuevo -> Antiguo
-    temp->back = dll->front;    // Antiguo -> Nuevo
+    ((NodeDLL)dll->front)->next = temp;    // Nuevo -> Antiguo
+    (NodeDLL)temp->back = (NodeDLL)dll->front;    // Antiguo -> Nuevo
     return;
 }
 
@@ -38,7 +38,7 @@ void* dll_pop(DoubleLinkedList dll){
         dll->front = dll->rear = NULL;
     }
     else {
-        dll->rear = temp->back;
+        (NodeDLL)dll->rear = (NodeDLL)temp->back;
         dll->rear->next = NULL;
     }
     free(temp);
@@ -50,7 +50,7 @@ void* dll_search(DoubleLinkedList dll, void *key, ComparativeFunctionDLL comp){
     while(node){
         if(comp(node->data, key))
             return node->data;
-        node = node->next;
+        node = (NodeDLL)node->next;
     }
     return NULL;
 }
@@ -63,7 +63,7 @@ void dll_insert(DoubleLinkedList dll, void *data, ComparativeFunctionDLL comp, D
             node->data = data;
             return;
         }
-        node = node->next;
+        node = (NodeDLL)node->next;
     }
     node = node_dll_create(data, dll->custom_malloc);
     node->back = dll->rear;
@@ -80,19 +80,19 @@ void dll_node_delete(DoubleLinkedList dll, void *data, ComparativeFunctionDLL co
                 dll->front = node->next;
             }
             else {
-                node->back->next = node->next;
+                ((NodeDLL)node->back)->next = node->next;
             }
             if(node->next == NULL){
                 dll->rear = node->back;
             }
             else {
-                node->next->back = node->back;
+                ((NodeDLL)node->next)->back = node->back;
             }
             free(node);
+            break;
         }
         node = node->next;
     }
-    return;
 }
 
 void dll_destroy(DoubleLinkedList dll, DestructiveFunctionDLL destr){

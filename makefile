@@ -1,4 +1,6 @@
-FLAGS = -Wall -Wextra -Werror -std=c99 -g -pthread
+FLAGS = -std=c99 -g -pthread
+
+# -Wall -Wextra -Werror
 
 S = structures/
 SL = structure_lock/
