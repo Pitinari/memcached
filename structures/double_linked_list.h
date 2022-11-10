@@ -8,6 +8,8 @@ typedef bool (*ComparativeFunctionDLL)(void *data1, void *data2);
 contrario */
 typedef void (*DestructiveFunctionDLL)(void *data);
 /** Libera la memoria alocada para el dato */
+typedef void *(*AlloccateFunctionDLL)(size_t size);
+/** malloc personalizado */
 
 struct _NodeDLL {
     struct _Node *back, *next;
@@ -18,13 +20,14 @@ typedef struct _NodeDLL *NodeDLL;
 
 struct _DoubleLinkedList {
     struct NodeDLL rear, front;
+    AlloccateFunctionDLL custom_malloc;
 };
 
 typedef struct _DoubleLinkedList *DoubleLinkedList;
 
 NodeDLL node_dll_create(void *data);
 
-DoubleLinkedList dll_create();
+DoubleLinkedList dll_create(AllocateFunctionDLL custom_malloc);
 
 void dll_push(DoubleLinkedList dll, void *data);
 

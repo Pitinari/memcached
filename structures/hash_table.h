@@ -10,8 +10,8 @@ typedef bool (*ComparativeFunction)(void *data1, void *data2);
 contrario */
 typedef void (*DestructiveFunction)(void *data);
 /** Libera la memoria alocada para el dato */
-typedef unsigned (*HashFunction)(void *data);
-/** Retorna un entero sin signo para el dato */
+typedef void *(*AlloccateFunction)(size_t size);
+/** malloc personalizado */
 
 /**
  * Estructura principal que representa la tabla hash.
@@ -22,7 +22,7 @@ struct _HashTable {
   unsigned size;
   ComparativeFunction comp;
   DestructiveFunction destr;
-  HashFunction hash;
+  AlloccateFunctionDLL custom_malloc;
 };
 
 typedef struct _HashTable *HashTable;
@@ -31,8 +31,7 @@ typedef struct _HashTable *HashTable;
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
 HashTable create_hashtable(unsigned size, ComparativeFunction comp,
-                         DestructiveFunction destr, HashFunction hash,
-                         CopyFunction copy);
+                         DestructiveFunction destr, AlloccateFunctionDLL custom_malloc);
 
 /**
  * Retorna el numero de elementos de la tabla.
@@ -42,7 +41,7 @@ unsigned hashtable_nelems(HashTable table);
 /**
  * Retorna la capacidad de la tabla.
  */
-unsigned hashtable_capacity(HashTable table);
+unsigned hashtable_size(HashTable table);
 
 /**
  * Destruye la tabla.
@@ -52,17 +51,17 @@ void hashtable_destroy(HashTable table);
 /**
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
-void hashtable_insert(HashTable table, void *data);
+void hashtable_insert(HashTable table, unsigned hashedValue, void *data);
 
 /**
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
  * buscado no se encuentra en la tabla.
  */
-void *hashtable_search(HashTable table, void *data);
+void *hashtable_search(HashTable table, unsigned hashedValue, void *data);
 
 /**
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void hashtable_delete(HashTable table, void *data);
+void hashtable_delete(HashTable table, unsigned hashedValue, void *data);
 
 #endif /* __HASHTABLE_H__ */

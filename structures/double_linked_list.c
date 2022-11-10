@@ -1,23 +1,24 @@
 #include "double_linked_list"
 
-NodeDLL node_dll_create(void *data){
-    NodeDLL node = (NodeDLL) malloc(sizeof(struct _NodeDLL));
+NodeDLL node_dll_create(void *data, AllocationFunction custom_malloc){
+    NodeDLL node = (NodeDLL) custom_malloc(sizeof(struct _NodeDLL));
     node->back = NULL;
     node->next = NULL;
     node->data = data;
     return node;
 }
 
-DoubleLinkedList dll_create(){
-    DoubleLinkedList dll = (DoubleLinkedList) malloc(sizeof(struct _DoubleLinkedList));
+DoubleLinkedList dll_create(AllocationFunction custom_malloc){
+    DoubleLinkedList dll = (DoubleLinkedList) custom_malloc(sizeof(struct _DoubleLinkedList));
     dll->front = NULL;
     dll->rear = NULL;
+    dll->custom_malloc = custom_malloc;
     return dll;
 }
 
 void dll_push(DoubleLinkedList dll, void *data){
     NodeDLL temp = dll->front;
-    dll->front = node_dll_create(data);
+    dll->front = node_dll_create(data, dll->custom_malloc);
     if(temp == NULL){ //dll vacia
         dll->rear = dll->front;
         return;
@@ -64,7 +65,7 @@ void dll_insert(DoubleLinkedList dll, void *data, ComparativeFunctionDLL comp, D
         }
         node = node->next;
     }
-    node = node_dll_create(data);
+    node = node_dll_create(data, dll->custom_malloc);
     node->back = dll->rear;
     dll->rear = dll->rear->next = node;
     return;
