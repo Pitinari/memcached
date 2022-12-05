@@ -19,103 +19,167 @@ List list_create(
     DestructiveFunctionNode dest
 ){
     List list = (List) malloc(sizeof(struct _List));
-    listWithLRU->front = NULL;
-    listWithLRU->rear = NULL;
-    listWithLRU->custom_malloc = custom_malloc;
-    return listWithLRU;
+    if (list) {
+        list->front = NULL;
+        list->rear = NULL;
+        list->custom_malloc = custom_malloc;
+        list->comp = comp;
+        list->dest = dest;
+    }
+    return list;
 }
 
-void list_with_lru_push(ListWithLRU listWithLRU, void *data){
-    NodeListLRU temp = listWithLRU->front;
-    listWithLRU->front = node_dll_create(data, listWithLRU->custom_malloc);
-    if(temp == NULL){ //dll vacia
-        listWithLRU->rear = listWithLRU->front;
-        return;
+LRU lru_create(
+    AllocationFunctionNode custom_malloc,
+    DestructiveFunctionNode dest
+){
+    LRU lru = (LRU) malloc(sizeof(struct _LRU));
+    if (lru) {
+        lru->front = NULL;
+        lru->rear = NULL;
+        lru->custom_malloc = custom_malloc;
+        lru->dest = dest;
     }
-    ((NodeListLRU)listWithLRU->front)->next = temp;    // Nuevo -> Antiguo
-    (NodeListLRU)temp->back = (NodeListLRU)listWithLRU->front;    // Antiguo -> Nuevo
-    return;
+    return lru;
 }
 
-void* list_with_lru_pop(ListWithLRU listWithLRU){
-    if(listWithLRU->rear == NULL){
-        return NULL;
+void list_put(List list, LRU lru, void *data){
+    if(list->front == NULL) {
+        list->front = node_list_lru_create(data, list->custom_malloc);
+        list->rear = list->front;
+        list->front->nextLRU = lru->front;
+        lru->front = list->front;
+        if(lru->rear == NULL) {
+            lru->rear = lru->front;
+        } else {
+            lru->front->nextLRU->backLRU = lru->front;
+        }
+    } else {
+        NodeListLRU temp = list->front;
+        while(temp && !list->comp(data, temp->data)) {
+            temp = temp->nextList;
+        }
+        if(temp){
+            list->dest(temp->data);
+            temp->data = data;
+            if(temp != lru->front){
+                temp->backLRU->nextLRU = temp->nextLRU;
+                if(temp->nextLRU){
+                    temp->nextLRU->backLRU = temp->backLRU;
+                }
+                temp->nextLRU = lru->front;
+                lru->front->backLRU = temp;
+                lru->front = temp;
+            }
+        } else {
+            temp = list->rear;
+            list->rear = node_list_lru_create(data, list->custom_malloc);
+            list->rear->backList = temp;
+            temp->nextList = list->rear;
+            list->rear->nextLRU = lru->front;
+            lru->front = list->rear;
+            lru->front->nextLRU->backLRU = lru->front;
+        }
     }
-    void *data = listWithLRU->rear->data;
-    NodeListLRU temp = listWithLRU->rear;
-    if(temp->back == NULL){
-        listWithLRU->front = listWithLRU->rear = NULL;
-    }
-    else {
-        (NodeListLRU)listWithLRU->rear = (NodeListLRU)temp->back;
-        listWithLRU->rear->next = NULL;
-    }
-    free(temp);
-    return data;
 }
 
-void* list_with_lru_search(ListWithLRU listWithLRU, void *key, ComparativeFunctionNode comp){
-    NodeListLRU node = listWithLRU->front;
-    while(node){
-        if(comp(node->data, key))
-            return node->data;
-        node = (NodeListLRU)node->next;
+void* list_delete(List list, LRU lru, void *data){
+    if(list->front != NULL) {
+        NodeListLRU temp = list->front;
+        while(temp && !list->comp(data, temp->data)) {
+            temp = temp->nextList;
+        }
+        if(temp){
+            void *returnData = temp->data;
+            if(temp->nextList){
+                temp->nextList->backList = temp->backList;
+            }
+            if(temp->backList) {
+                temp->backList->nextList = temp->nextList;
+            }
+            if(temp->nextLRU){
+                temp->nextLRU->backLRU = temp->backLRU;
+            }
+            if(temp->backLRU) {
+                temp->backLRU->nextLRU = temp->nextLRU;
+            }
+            if(temp == lru->front){
+                lru->front = temp->nextLRU;
+            }
+            if(temp == lru->rear){
+                lru->rear = temp->backLRU;
+            }
+            if(temp == list->front){
+                list->front = temp->nextList;
+            }
+            if(temp == list->rear){
+                list->rear = temp->backList;
+            }
+            free(temp);
+            return returnData;
+        }
     }
     return NULL;
 }
 
-void list_with_lru_insert(ListWithLRU listWithLRU, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr){
-    NodeDLL node = listWithLRU->front;
-    while(node){
-        if(comp(node->data, data)){
-            destr(node->data);
-            node->data = data;
-            return;
+void* list_get(List list, void *data){
+    if(list->front != NULL) {
+        NodeListLRU temp = list->front;
+        while(temp && !list->comp(data, temp->data)) {
+            temp = temp->nextList;
         }
-        node = (NodeDLL)node->next;
+        if(temp){
+            return temp->data;
+        }
     }
-    node = node_dll_create(data, listWithLRU->custom_malloc);
-    node->back = listWithLRU->rear;
-    listWithLRU->rear = listWithLRU->rear->next = node;
-    return;
+    return NULL;
 }
 
-void list_with_lru_node_delete(ListWithLRU listWithLRU, void *data, ComparativeFunctionDLL comp, DestructiveFunctionDLL destr){
-    NodeDLL node = listWithLRU->front;
-    while(node){
-        if(comp(node->data, data)){
-            destr(node->data);
-            if(node->back == NULL){
-                listWithLRU->front = node->next;
+// TODO: Check if any thread already deallocate the structure
+bool lru_deallocate(LRU lru, void *data, CallbackFunctionLRU callback){
+    if(lru->rear != NULL) {
+        int alreadyDeallocated = 0;
+        NodeListLRU temp = lru->rear;
+        List currentList = NULL;
+        while(temp || alreadyDeallocated >= 10) {
+            currentList = callback(temp->data);
+            lru->dest(temp->data);
+            lru->rear = temp->backLRU;
+
+            if(temp->nextList){
+                temp->nextList->backList = temp->backList;
             }
-            else {
-                ((NodeDLL)node->back)->next = node->next;
+            if(temp->backList){
+                temp->backList->nextList = temp->nextList;
             }
-            if(node->next == NULL){
-                listWithLRU->rear = node->back;
+            if(currentList->front == temp){
+                currentList->front = temp->nextList;
             }
-            else {
-                ((NodeDLL)node->next)->back = node->back;
+            if(currentList->rear == temp){
+                currentList->rear = temp->backList;
             }
-            free(node);
-            break;
+
+            free(temp);
+            temp = lru->rear;
         }
-        node = node->next;
+        if(temp) {
+            temp->nextLRU = NULL;
+        }
+    } else {
+        return false;
     }
 }
 
-void list_with_lru_destroy(ListWithLRU listWithLRU, DestructiveFunctionDLL destr){
-    NodeDLL node = listWithLRU->front;
-    while(node){
-        destr(node->data);
-        if(node->next){
-            node = node->next;
-            free(node->back);
-        }
-        else{
-            free(node);
-            node = NULL;
-        }
+void list_destroy(List list){
+    free(list);
+}
+
+void lru_destroy(LRU lru){
+    NodeListLRU current = lru->front;
+    while (current) {
+        lru->dest(current->data);
+        current = lru->front->nextLRU;
+        free(lru->front);
     }
-    free(listWithLRU);
+    free(lru);
 }
