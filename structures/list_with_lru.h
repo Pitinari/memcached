@@ -11,8 +11,10 @@ typedef void (*DestructiveFunctionNode) (void *data);
 /** Libera la memoria alocada para el dato */
 typedef void *(*AllocationFunctionNode)(size_t size);
 /** malloc personalizado */
-typedef List (CallbackFunctionLRU)(void *data);
-/** malloc personalizado */
+typedef List (*InitDeallocateFunctionLRU)(void *forwardRef, void *data);
+/** preprocessing deallocate */
+typedef void (*EndDeallocateFunctionLRU)(void *forwardRef, void *data);
+/** postprocessing deallocate */
 
 struct _NodeListLRU {
     struct _NodeListLRU *backList, *nextList, *backLRU, *nextLRU;
@@ -32,6 +34,9 @@ struct _LRU {
     NodeListLRU rear, front;
     AllocationFunctionNode custom_malloc;
     DestructiveFunctionNode dest;
+    InitDeallocateFunctionLRU preprocessing;
+    EndDeallocateFunctionLRU postprocessing;
+    void *forwardRef;
 };
 
 typedef struct _List *List;
@@ -48,7 +53,10 @@ List list_create(
 
 LRU lru_create(
     AllocationFunctionNode custom_malloc,
-    DestructiveFunctionNode dest
+    DestructiveFunctionNode dest,
+    InitDeallocateFunctionLRU preprocessing,
+    EndDeallocateFunctionLRU postprocessing,
+    void *forwardRef
 );
 
 void list_put(List list, LRU lru, void *data);
@@ -57,7 +65,7 @@ void* list_delete(List list, LRU lru, void *data);
 
 void* list_get(List list, void *data);
 
-bool lru_deallocate(LRU lru, void *data, CallbackFunctionLRU callback);
+bool lru_deallocate(LRU lru, void *data);
 
 void list_destroy(List list);
 

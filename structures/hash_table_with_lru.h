@@ -2,7 +2,7 @@
 #define __HASHTABLE_H__
 
 #include <stdbool.h>
-#include "double_linked_list.h"
+#include "list_with_lru.h"
 
 /** Retorna una copia fisica del dato */
 typedef bool (*ComparativeFunction)(void *data1, void *data2);
@@ -17,7 +17,8 @@ typedef void *(*AlloccateFunction)(size_t size);
  * Estructura principal que representa la tabla hash.
  */
 struct _HashTable {
-  struct NodeDLL *elems;
+  List *elems;
+  LRU lru;
   unsigned numElems;
   unsigned size;
   ComparativeFunction comp;

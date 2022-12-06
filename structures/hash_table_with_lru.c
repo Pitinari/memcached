@@ -1,9 +1,7 @@
-#include "hash_table.h"
+#include "list_with_lru.h"
 
 #include <stdlib.h>
 #include <math.h>
-
-#define RESIZE_FACTOR 5
 
 /**
  * Crea una nueva tabla hash vacia, con la capacidad dada.

@@ -31,7 +31,10 @@ List list_create(
 
 LRU lru_create(
     AllocationFunctionNode custom_malloc,
-    DestructiveFunctionNode dest
+    DestructiveFunctionNode dest,
+    InitDeallocateFunctionLRU preprocessing,
+    EndDeallocateFunctionLRU postprocessing,
+    void *forwardRef
 ){
     LRU lru = (LRU) malloc(sizeof(struct _LRU));
     if (lru) {
@@ -39,6 +42,9 @@ LRU lru_create(
         lru->rear = NULL;
         lru->custom_malloc = custom_malloc;
         lru->dest = dest;
+        lru->preprocessing;
+        lru->postprocessing;
+        lru-> forwardRef;
     }
     return lru;
 }
@@ -136,13 +142,13 @@ void* list_get(List list, void *data){
 }
 
 // TODO: Check if any thread already deallocate the structure
-bool lru_deallocate(LRU lru, void *data, CallbackFunctionLRU callback){
+bool lru_deallocate(LRU lru, void *data){
     if(lru->rear != NULL) {
         int alreadyDeallocated = 0;
         NodeListLRU temp = lru->rear;
         List currentList = NULL;
         while(temp || alreadyDeallocated >= 10) {
-            currentList = callback(temp->data);
+            currentList = lru->preprocessing(lru->forwardRef, temp->data);
             lru->dest(temp->data);
             lru->rear = temp->backLRU;
 
@@ -159,8 +165,9 @@ bool lru_deallocate(LRU lru, void *data, CallbackFunctionLRU callback){
                 currentList->rear = temp->backList;
             }
 
-            free(temp);
             temp = lru->rear;
+            lru->postprocessing(lru->forwardRef, temp->data);
+            free(temp);
         }
         if(temp) {
             temp->nextLRU = NULL;
