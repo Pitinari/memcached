@@ -1,10 +1,11 @@
 #include "list_with_lru.h"
 
-NodeListLRU node_list_lru_create(
-	void *data, 
-	AllocationFunctionNode custom_malloc
+NodeLL nodell_create(
+	void *data,
+	List list,
+	LRU lru
 ){
-	NodeListLRU node = (NodeListLRU) custom_malloc(sizeof(struct _NodeListLRU));
+	NodeLL node = (NodeLL) lru->custom_malloc(lru->forwardRef, sizeof (struct _NodeLL), list);
 	node->backList = NULL;
 	node->nextList = NULL;
 	node->backLRU = NULL;
@@ -13,9 +14,7 @@ NodeListLRU node_list_lru_create(
 	return node;
 }
 
-List list_create(
-	AllocationFunctionNode custom_malloc
-){
+List list_create(){
 	List list = (List) malloc(sizeof(struct _List));
 	if (list) {
 		list->front = NULL;
@@ -48,12 +47,10 @@ void list_put(
 	List list, 
 	LRU lru, 
 	void *data,
-	AllocationFunctionNode custom_malloc,
-	ComparativeFunctionNode comp,
-	DestructiveFunctionNode dest
+	ComparativeFunctionNode comp
 ){
 	if(list->front == NULL) {
-		list->front = node_list_lru_create(data, custom_malloc);
+		list->front = nodell_create(data, lru->custom_malloc, list);
 		list->rear = list->front;
 		list->front->nextLRU = lru->front;
 		lru->front = list->front;
@@ -63,12 +60,12 @@ void list_put(
 			lru->front->nextLRU->backLRU = lru->front;
 		}
 	} else {
-		NodeListLRU temp = list->front;
+		NodeLL temp = list->front;
 		while(temp && !comp(data, temp->data)) {
 			temp = temp->nextList;
 		}
 		if(temp){
-			dest(temp->data);
+			lru->dest(temp->data);
 			temp->data = data;
 			if(temp != lru->front){
 				temp->backLRU->nextLRU = temp->nextLRU;
@@ -81,7 +78,7 @@ void list_put(
 			}
 		} else {
 			temp = list->rear;
-			list->rear = node_list_lru_create(data, custom_malloc);
+			list->rear = nodell_create(data, lru->custom_malloc, list);
 			list->rear->backList = temp;
 			temp->nextList = list->rear;
 			list->rear->nextLRU = lru->front;
@@ -98,7 +95,7 @@ void* list_delete(
 	ComparativeFunctionNode comp
 ){
 	if(list->front != NULL) {
-		NodeListLRU temp = list->front;
+		NodeLL temp = list->front;
 		while(temp && !comp(data, temp->data)) {
 			temp = temp->nextList;
 		}
@@ -141,7 +138,7 @@ void* list_get(
 	ComparativeFunctionNode comp
 ){
 	if(list->front != NULL) {
-		NodeListLRU temp = list->front;
+		NodeLL temp = list->front;
 		while(temp && !comp(data, temp->data)) {
 			temp = temp->nextList;
 		}
@@ -153,13 +150,13 @@ void* list_get(
 }
 
 // TODO: Check if any thread already deallocate the structure
-bool lru_deallocate(LRU lru, void *data){
+bool lru_deallocate(LRU lru, List currentList){
 	if(lru->rear != NULL) {
 		int alreadyDeallocated = 0;
-		NodeListLRU temp = lru->rear;
+		NodeLL temp = lru->rear;
 		List currentList = NULL;
 		while(temp || alreadyDeallocated >= 10) {
-			currentList = lru->preprocessing(lru->forwardRef, temp->data);
+			currentList = lru->preprocessing(lru->forwardRef, temp->data, currentList);
 			lru->dest(temp->data);
 			lru->rear = temp->backLRU;
 
@@ -177,8 +174,7 @@ bool lru_deallocate(LRU lru, void *data){
 			}
 
 			temp = lru->rear;
-			lru->postprocessing(lru->forwardRef, temp->data);
-			free(temp);
+			lru->postprocessing(lru->forwardRef, temp->data, currentList);
 		}
 		if(temp) {
 			temp->nextLRU = NULL;
@@ -193,7 +189,7 @@ void list_destroy(List list){
 }
 
 void lru_destroy(LRU lru){
-	NodeListLRU current = lru->front;
+	NodeLL current = lru->front;
 	while (current) {
 		lru->dest(current->data);
 		current = lru->front->nextLRU;

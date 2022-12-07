@@ -17,24 +17,28 @@ typedef unsigned (*HashFunction)(void *key);
  * Estructura principal que representa la tabla hash.
  */
 struct _HashTable {
-  List *elems;
+  List *lists;
+  pthread_mutex_t **lists_locks;
   LRU lru;
+  pthread_mutex_t *lru_lock;
   unsigned numElems;
   unsigned size;
-  ComparativeFunctionHash comp;
-  DestructiveFunctionHash destr;
 };
 
 typedef struct _HashTable *HashTable;
 
+struct _NodeHT {
+  void *key;
+  void *value;
+  unsigned hashedKey;
+};
+
+typedef struct _NodeHT *NodeHT;
+
 /**
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
-HashTable create_hashtable(
-  unsigned size, 
-  ComparativeFunctionHash comp,
-  DestructiveFunctionHash destr, 
-  AlloccateFunctionHash custom_malloc);
+HashTable create_hashtable(unsigned size);
 
 /**
  * Retorna el numero de elementos de la tabla.
@@ -54,7 +58,7 @@ void hashtable_destroy(HashTable table);
 /**
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
-void hashtable_insert(HashTable table, unsigned hashedValue, void *data);
+void hashtable_insert(HashTable table, void *key, void *value);
 
 /**
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
@@ -65,6 +69,8 @@ void *hashtable_search(HashTable table, unsigned hashedValue, void *data);
 /**
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void hashtable_delete(HashTable table, unsigned hashedValue, void *data);
+void *hashtable_delete(HashTable table, void *key, void *value);
+
+void *custom_malloc(HashTable hashTable, size_t size);
 
 #endif /* __HASHTABLE_H__ */

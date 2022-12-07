@@ -9,26 +9,28 @@ typedef bool (*ComparativeFunctionNode) (void *data1, void *data2);
 contrario */
 typedef void (*DestructiveFunctionNode) (void *data);
 /** Libera la memoria alocada para el dato */
-typedef void *(*AllocationFunctionNode)(size_t size);
+typedef void *(*AllocationFunctionNode)(void *forwardRef, size_t size, List currentList);
 /** malloc personalizado */
-typedef List (*InitDeallocateFunctionLRU)(void *forwardRef, void *data);
+typedef struct _List *(*InitDeallocateFunctionLRU)(void *forwardRef, void *data, List currentList);
 /** preprocessing deallocate */
-typedef void (*EndDeallocateFunctionLRU)(void *forwardRef, void *data);
+typedef void (*EndDeallocateFunctionLRU)(void *forwardRef, void *data, List currentList);
 /** postprocessing deallocate */
 
-struct _NodeListLRU {
-	struct _NodeListLRU *backList, *nextList, *backLRU, *nextLRU;
+struct _NodeLL {
+	struct _NodeLL *backList, *nextList, *backLRU, *nextLRU;
 	void *data;
 };
 
-typedef struct _NodeListLRU *NodeListLRU;
+typedef struct _NodeLL *NodeLL;
 
 struct _List {
-	NodeListLRU rear, front;
+	NodeLL rear, front;
 };
 
+typedef struct _List *List;
+
 struct _LRU {
-	NodeListLRU rear, front;
+	NodeLL rear, front;
 	AllocationFunctionNode custom_malloc;
 	DestructiveFunctionNode dest;
 	InitDeallocateFunctionLRU preprocessing;
@@ -36,12 +38,12 @@ struct _LRU {
 	void *forwardRef;
 };
 
-typedef struct _List *List;
 typedef struct _LRU *LRU;
 
-NodeListLRU node_list_lru_create(
+NodeLL nodell_create(
 	void *data, 
-	AllocationFunctionNode custom_malloc);
+	List currentList,
+	LRU lru);
 
 List list_create(AllocationFunctionNode custom_malloc);
 
@@ -75,7 +77,7 @@ void* list_get(
 	ComparativeFunctionNode comp    
 );
 
-bool lru_deallocate(LRU lru, void *data);
+bool lru_deallocate(LRU lru, List currentList);
 
 void list_destroy(List list);
 
