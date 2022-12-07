@@ -5,9 +5,9 @@
 
 // Estructura de tabla hash con lock
 struct _ConcurrentHashTableWithLRU{
-    HashTable hashtable;
-    pthread_mutex_t tableLock;
-    struct rw_lock **lock;
+	HashTable hashtable;
+	pthread_mutex_t tableLock;
+	struct rw_lock **lock;
 };
 
 typedef unsigned (*HashFunction)(void *data);
@@ -16,9 +16,9 @@ typedef unsigned (*HashFunction)(void *data);
 typedef struct _ConcurrentHashTableWithLRU ConcurrentHashTableWithLRU;
 
 ConcurrentHashTableWithLRU create_concurrent_hashtable(
-    unsigned size, 
-    ComparativeFunctionHash comp, 
-    DestructiveFunctionHash destr
+	unsigned size, 
+	ComparativeFunctionHash comp, 
+	DestructiveFunctionHash destr
 );
 
 /**

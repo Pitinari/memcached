@@ -92,10 +92,10 @@ void list_put(
 }
 
 void* list_delete(
-		List list, 
-		LRU lru, 
-		void *data,
-		ComparativeFunctionNode comp
+	List list, 
+	LRU lru, 
+	void *data,
+	ComparativeFunctionNode comp
 ){
 	if(list->front != NULL) {
 		NodeListLRU temp = list->front;
