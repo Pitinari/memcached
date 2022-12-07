@@ -54,7 +54,7 @@ int get_length(int fd) {
 }
 
 // Handler de una conexion a cliente en modo binario
-void binary(struct fdinfo *fdinfo) {
+void binary(struct fdinfo *fdinfo, Memcached table) {
 	int fd = fdinfo->fd;
 	int t;
 
@@ -86,8 +86,8 @@ void binary(struct fdinfo *fdinfo) {
 			void *value = malloc(length);
 			t = read(fd, value, length);
 
-			int i = memcached_put(key, value);
-			if (!i) {
+			int i = memcached_put(table, key, value);
+			if (i == 0) {
 				int code = OK;
 				write(fd, &code, 1);
 			}
@@ -97,8 +97,8 @@ void binary(struct fdinfo *fdinfo) {
 			void *key = malloc(length);
 			t = read(fd, key, length);
 
-			int i = memcached_delete(key);
-			if (!i) {
+			int i = memcached_delete(table, key);
+			if (i == 0) {
 				int code = OK;
 				write(fd, &code, 1);
 			} else {
@@ -111,9 +111,8 @@ void binary(struct fdinfo *fdinfo) {
 			void *key = malloc(length);
 			t = read(fd, key, length);
 
-			void *value;
-			int i = memcached_get(key, value);
-			if (!i) {
+			void *value = memcached_get(table, key);
+			if (value != NULL) {
 				int code = OK;
 				write(fd, &code, 1);
 				write(fd, value, len(value));
@@ -128,9 +127,8 @@ void binary(struct fdinfo *fdinfo) {
 			void *key = malloc(length);
 			t = read(fd, key, length);
 
-			void *value;
-			int i = memcached_take(key, value);
-			if (!i) {
+			void *value = memcached_take(table, key);
+			if (value != NULL) {
 				int code = OK;
 				write(fd, &code, 1);
 				write(fd, value, len(value));
@@ -140,7 +138,9 @@ void binary(struct fdinfo *fdinfo) {
 			}
 		} 
 		else if (buf == STATS) {
-			memcached_stats(fd);
+			char* line = memcached_stats(table);
+			write(fd, line, len(line));
+			free(line);
 		} 
 		else {
 			int code = EINVAL;
@@ -151,7 +151,7 @@ void binary(struct fdinfo *fdinfo) {
 }
 
 // Handler de una conexion a cliente en modo texto
-void text(struct fdinfo *fdinfo) {
+void text(struct fdinfo *fdinfo, Memcached table) {
 	int fd = fdinfo->fd;
 	int t;
 	char /*buf1[2048],*/ input[2048];
@@ -181,15 +181,15 @@ void text(struct fdinfo *fdinfo) {
 			char *key = strtok(NULL, " ");
 			char *value = strtok(NULL, " ");
 
-			int i = put(key, value);
-			if (!i)
+			int i = memcached_put(table, key, value);
+			if (i == 0)
 				write(fd, "OK", 2);
 		} 
 		else if (strcmp(comm, "DEL") == 0) {
 			char *key = strtok(NULL, " ");
 
-			int i = delete(key);
-			if (!i) {
+			int i = memcached_del(key);
+			if (i == 0) {
 				write(fd, "OK", 2);
 			} else {
 				write(fd, "ENOTFOUND", 9);
@@ -199,8 +199,8 @@ void text(struct fdinfo *fdinfo) {
 			char *key = strtok(NULL, " ");
 
 			void *value;
-			int i = get(key, value);
-			if (!i) {
+			int i = memcached_get(table, key);
+			if (i == 0) {
 				if (1/*representable*/) {
 					write(fd, "OK ", 3);
 					write(fd, value, strlen(value));
@@ -217,8 +217,8 @@ void text(struct fdinfo *fdinfo) {
 			char *key = strtok(NULL, " ");
 
 			void *value;
-			int i = take(key, value);
-			if (!i) {
+			int i = memcached_take(table, key);
+			if (i == 0) {
 				if (1/*representable*/) {
 					write(fd, "OK ", 3);
 					write(fd, value, strlen(value));
@@ -231,7 +231,8 @@ void text(struct fdinfo *fdinfo) {
 			}
 		} 
 		else if (strcmp(comm, "STATS") == 0) {
-			stats(fd);
+			char* stats = memcached_stats(table);
+			write(fd, stats, strlen(stats));
 		} 
 		else {
 			write(fd, "EINVAL", 6);

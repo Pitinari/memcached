@@ -1,16 +1,13 @@
 #ifndef __CONCURRENTHASHTABLEWITHLRU_H__
 #define __CONCURRENTHASHTABLEWITHLRU_H__
 
-#include "hash_table.h"
-#include "../structure_lock/rwlock.h"
+#include "hash_table_with_lru.h"
 
 // Estructura de tabla hash con lock
 struct _ConcurrentHashTableWithLRU{
     HashTable hashtable;
     pthread_mutex_t tableLock;
     struct rw_lock **lock;
-    struct rw_lock *lruLock;
-    DoubleLinkedList lru;
 };
 
 typedef unsigned (*HashFunction)(void *data);

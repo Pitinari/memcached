@@ -10,7 +10,8 @@ contrario */
 typedef void (*DestructiveFunctionHash)(void *data);
 /** Libera la memoria alocada para el dato */
 typedef void *(*AlloccateFunctionHash)(size_t size);
-/** malloc personalizado */
+/** Retorna un entero sin signo para el dato */
+typedef unsigned (*HashFunction)(void *key);
 
 /**
  * Estructura principal que representa la tabla hash.

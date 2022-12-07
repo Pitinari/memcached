@@ -1,31 +1,51 @@
 #include <stdlib.h>
-#include "concurrent_hash_table.h"
-#include "../utils/hash.h"
+#include "memcached_service.h"
+#include "./structure_lock/rwlock.h"
 
-Memcached memcached_create(unsigned size, ComparativeFunction comp,
+Memcached memcached_create(unsigned size, CopyFunction copy, ComparativeFunction comp,
                          DestructiveFunction destr, HashFunction hash){
     struct rw_lock lock;
     rw_lock_init(&lock);
-    HashTable table = create_hashtable(size, comp, destr, hash);
-    Memcached mc = malloc(sizeof(struct _Memcached));
+    HashTable table = create_hashtable(size, copy, comp, destr, hash);
+    Memcached mc = malloc(sizeof(ConcurrentHashTableWithLRU));
     mc->hashtable = table;
     mc->lock = &lock;
-    mc->lru = dll_create();
     return mc;
 }
 
-
-
-bool memcached_put(Memcached table, void* key, void *data){
-    unsigned keyHash = hash_string((char *)key);
+int memcached_put(Memcached table, void* key, void *data) {
+    int idx = table->hashtable->hash(key) % table->hashtable->size;
+    concurrent_hashtable_insert(*table, idx, data);
 }
 
-void *memcached_get(Memcached table, void *key);
+void *memcached_get(Memcached table, void *key) {
+    int idx = table->hashtable->hash(key) % table->hashtable->size;
+    concurrent_hashtable_get(*table, idx, key);
+}
 
-void *memcached_take(Memcached table, void *key);
+void *memcached_take(Memcached table, void *key) {
+    int idx = table->hashtable->hash(key) % table->hashtable->size;
+    void *res = concurrent_hashtable_take(*table, idx, key);
+    return res;
+}
 
-bool memcached_delete(Memcached table, void *data);
+int memcached_delete(Memcached table, void *key) {
+    int idx = table->hashtable->hash(key) % table->hashtable->size;
+    void* res = concurrent_hashtable_take(*table, idx, key);
+    if (res == NULL) {
+        return 0;
+    }
+    else {
+        return 1;
+    }
+}
 
-char* memcached_stats(Memcached table);
+char *memcached_stats(Memcached table);
 
-void memcached_destroy(Memcached table);
+int memcached_destroy(Memcached table) {
+    for (unsigned i = 0; i < table->hashtable->size; i++) {
+        list_destroy(table->hashtable->elems[i]);
+    }
+    //finalizar lock
+    free(table);
+}
