@@ -2,11 +2,11 @@
 #include "memcached_service.h"
 #include "./structure_lock/rwlock.h"
 
-Memcached memcached_create(unsigned size, CopyFunction copy, ComparativeFunction comp,
-                         DestructiveFunction destr, HashFunction hash){
+Memcached memcached_create(unsigned size, ComparativeFunctionHash comp,
+                         DestructiveFunctionHash destr, HashFunction hash){
     struct rw_lock lock;
     rw_lock_init(&lock);
-    HashTable table = create_hashtable(size, copy, comp, destr, hash);
+    HashTable table = create_hashtable(size, comp, destr, custom_alloc);
     Memcached mc = malloc(sizeof(ConcurrentHashTableWithLRU));
     mc->hashtable = table;
     mc->lock = &lock;

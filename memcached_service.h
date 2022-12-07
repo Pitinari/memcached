@@ -5,8 +5,8 @@
 
 typedef ConcurrentHashTableWithLRU* Memcached; 
 
-Memcached memcached_create(unsigned size_hashtable, CopyFunction copy, ComparativeFunction comp_hashtable,
-                         DestructiveFunction destr_hashtable, HashFunction hash);
+Memcached memcached_create(unsigned size_hashtable, ComparativeFunctionHash comp_hashtable,
+                         DestructiveFunctionHash destr_hashtable, HashFunction hash);
 
 int memcached_put(Memcached table, void* key, void *data);
 

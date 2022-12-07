@@ -17,9 +17,8 @@ typedef struct _ConcurrentHashTableWithLRU ConcurrentHashTableWithLRU;
 
 ConcurrentHashTableWithLRU create_concurrent_hashtable(
     unsigned size, 
-    ComparativeFunction comp, 
-    DestructiveFunction destr, 
-    CopyFunction copy
+    ComparativeFunctionHash comp, 
+    DestructiveFunctionHash destr
 );
 
 /**
