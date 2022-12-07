@@ -4,13 +4,12 @@
 #include <stdbool.h>
 #include "list_with_lru.h"
 
-/** Retorna una copia fisica del dato */
-typedef bool (*ComparativeFunction)(void *data1, void *data2);
+typedef bool (*ComparativeFunctionHash)(void *data1, void *data2);
 /** Retorna un booleano que es true si los datos son iguales y false en caso
 contrario */
-typedef void (*DestructiveFunction)(void *data);
+typedef void (*DestructiveFunctionHash)(void *data);
 /** Libera la memoria alocada para el dato */
-typedef void *(*AlloccateFunction)(size_t size);
+typedef void *(*AlloccateFunctionHash)(size_t size);
 /** malloc personalizado */
 
 /**
@@ -21,9 +20,8 @@ struct _HashTable {
   LRU lru;
   unsigned numElems;
   unsigned size;
-  ComparativeFunction comp;
-  DestructiveFunction destr;
-  AlloccateFunctionDLL custom_malloc;
+  ComparativeFunctionHash comp;
+  DestructiveFunctionHash destr;
 };
 
 typedef struct _HashTable *HashTable;
@@ -31,8 +29,11 @@ typedef struct _HashTable *HashTable;
 /**
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
-HashTable create_hashtable(unsigned size, ComparativeFunction comp,
-                         DestructiveFunction destr, AlloccateFunctionDLL custom_malloc);
+HashTable create_hashtable(
+  unsigned size, 
+  ComparativeFunctionHash comp,
+  DestructiveFunctionHash destr, 
+  AlloccateFunctionHash custom_malloc);
 
 /**
  * Retorna el numero de elementos de la tabla.

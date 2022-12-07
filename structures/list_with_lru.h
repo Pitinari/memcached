@@ -25,9 +25,6 @@ typedef struct _NodeListLRU *NodeListLRU;
 
 struct _List {
     NodeListLRU rear, front;
-    AllocationFunctionNode custom_malloc;
-    ComparativeFunctionNode comp;
-    DestructiveFunctionNode dest;
 };
 
 struct _LRU {
@@ -46,10 +43,7 @@ NodeListLRU node_list_lru_create(
     void *data, 
     AllocationFunctionNode custom_malloc);
 
-List list_create(
-    AllocationFunctionNode custom_malloc, 
-    ComparativeFunctionNode comp,
-    DestructiveFunctionNode dest);
+List list_create(AllocationFunctionNode custom_malloc);
 
 LRU lru_create(
     AllocationFunctionNode custom_malloc,
@@ -59,11 +53,27 @@ LRU lru_create(
     void *forwardRef
 );
 
-void list_put(List list, LRU lru, void *data);
+void list_put(
+    List list, 
+    LRU lru, 
+    void *data,
+    AllocationFunctionNode custom_malloc,
+    ComparativeFunctionNode comp,
+    DestructiveFunctionNode dest
+);
 
-void* list_delete(List list, LRU lru, void *data);
+void* list_delete(
+    List list, 
+    LRU lru, 
+    void *data,
+    ComparativeFunctionNode comp
+);
 
-void* list_get(List list, void *data);
+void* list_get(
+    List list, 
+    void *data,
+    ComparativeFunctionNode comp    
+);
 
 bool lru_deallocate(LRU lru, void *data);
 
