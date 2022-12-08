@@ -4,18 +4,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-typedef bool (*ComparativeFunctionNode) (void *data1, void *data2);
-/** Retorna un booleano que es true si los datos son iguales y false en caso
-contrario */
-typedef void (*DestructiveFunctionNode) (void *data);
-/** Libera la memoria alocada para el dato */
-typedef void *(*AllocationFunctionNode)(void *forwardRef, size_t size, List currentList);
-/** malloc personalizado */
-typedef struct _List *(*InitDeallocateFunctionLRU)(void *forwardRef, void *data, List currentList);
-/** preprocessing deallocate */
-typedef void (*EndDeallocateFunctionLRU)(void *forwardRef, void *data, List currentList);
-/** postprocessing deallocate */
-
 struct _NodeLL {
 	struct _NodeLL *backList, *nextList, *backLRU, *nextLRU;
 	void *data;
@@ -29,10 +17,22 @@ struct _List {
 
 typedef struct _List *List;
 
+typedef bool (*ComparativeFunction) (void *data1, void *data2);
+/** Retorna un booleano que es true si los datos son iguales y false en caso
+contrario */
+typedef void (*DestructiveFunction) (void *data);
+/** Libera la memoria alocada para el dato */
+typedef void *(*AllocationFunction)(void *forwardRef, size_t size, List currentList);
+/** malloc personalizado */
+typedef List (*InitDeallocateFunctionLRU)(void *forwardRef, void *data, List currentList);
+/** preprocessing deallocate */
+typedef void (*EndDeallocateFunctionLRU)(void *forwardRef, void *data, List currentList);
+/** postprocessing deallocate */
+
 struct _LRU {
 	NodeLL rear, front;
-	AllocationFunctionNode custom_malloc;
-	DestructiveFunctionNode dest;
+	AllocationFunction custom_malloc;
+	DestructiveFunction dest;
 	InitDeallocateFunctionLRU preprocessing;
 	EndDeallocateFunctionLRU postprocessing;
 	void *forwardRef;
@@ -45,11 +45,11 @@ NodeLL nodell_create(
 	List currentList,
 	LRU lru);
 
-List list_create(AllocationFunctionNode custom_malloc);
+List list_create();
 
 LRU lru_create(
-	AllocationFunctionNode custom_malloc,
-	DestructiveFunctionNode dest,
+	AllocationFunction custom_malloc,
+	DestructiveFunction dest,
 	InitDeallocateFunctionLRU preprocessing,
 	EndDeallocateFunctionLRU postprocessing,
 	void *forwardRef
@@ -59,22 +59,22 @@ void list_put(
 	List list, 
 	LRU lru, 
 	void *data,
-	AllocationFunctionNode custom_malloc,
-	ComparativeFunctionNode comp,
-	DestructiveFunctionNode dest
+	AllocationFunction custom_malloc,
+	ComparativeFunction comp,
+	DestructiveFunction dest
 );
 
 void* list_delete(
 	List list, 
 	LRU lru, 
 	void *data,
-	ComparativeFunctionNode comp
+	ComparativeFunction comp
 );
 
 void* list_get(
 	List list, 
 	void *data,
-	ComparativeFunctionNode comp    
+	ComparativeFunction comp    
 );
 
 bool lru_deallocate(LRU lru, List currentList);

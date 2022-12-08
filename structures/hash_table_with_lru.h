@@ -4,11 +4,6 @@
 #include <stdbool.h>
 #include "list_with_lru.h"
 
-typedef bool (*ComparativeFunctionHash)(void *data1, void *data2);
-/** Retorna un booleano que es true si los datos son iguales y false en caso
-contrario */
-typedef void (*DestructiveFunctionHash)(void *data);
-/** Libera la memoria alocada para el dato */
 typedef void *(*AlloccateFunctionHash)(size_t size);
 /** Retorna un entero sin signo para el dato */
 typedef unsigned (*HashFunction)(void *key);
@@ -21,7 +16,6 @@ struct _HashTable {
   pthread_mutex_t **lists_locks;
   LRU lru;
   pthread_mutex_t *lru_lock;
-  unsigned numElems;
   unsigned size;
 };
 

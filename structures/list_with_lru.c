@@ -24,8 +24,8 @@ List list_create(){
 }
 
 LRU lru_create(
-	AllocationFunctionNode custom_malloc,
-	DestructiveFunctionNode dest,
+	AllocationFunction custom_malloc,
+	DestructiveFunction dest,
 	InitDeallocateFunctionLRU preprocessing,
 	EndDeallocateFunctionLRU postprocessing,
 	void *forwardRef
@@ -47,7 +47,7 @@ void list_put(
 	List list, 
 	LRU lru, 
 	void *data,
-	ComparativeFunctionNode comp
+	ComparativeFunction comp
 ){
 	if(list->front == NULL) {
 		list->front = nodell_create(data, lru->custom_malloc, list);
@@ -92,7 +92,7 @@ void* list_delete(
 	List list, 
 	LRU lru, 
 	void *data,
-	ComparativeFunctionNode comp
+	ComparativeFunction comp
 ){
 	if(list->front != NULL) {
 		NodeLL temp = list->front;
@@ -135,7 +135,7 @@ void* list_delete(
 void* list_get(
 	List list, 
 	void *data,
-	ComparativeFunctionNode comp
+	ComparativeFunction comp
 ){
 	if(list->front != NULL) {
 		NodeLL temp = list->front;

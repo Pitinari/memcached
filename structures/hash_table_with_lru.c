@@ -39,7 +39,6 @@ HashTable create_hashtable(unsigned size) {
   );
   if(!table->lru) goto error6;
 
-	table->numElems = 0;
 	table->size = size;
 
 	return table;
@@ -115,11 +114,6 @@ void lru_postprocessing(void *hashTable, void *data, List currentList){
 }
 
 /**
- * Retorna el numero de elementos de la tabla.
- */
-unsigned hashtable_nelems(HashTable table) { return table->numElems; }
-
-/**
  * Retorna la capacidad de la tabla.
  */
 unsigned hashtable_size(HashTable table) { return table->size; }
@@ -128,39 +122,23 @@ unsigned hashtable_size(HashTable table) { return table->size; }
  * Destruye la tabla.
  */
 void hashtable_destroy(HashTable table) {
-	// NodeListLRU node, aux;
-	// // Destruir cada uno de los datos.
-	// for (unsigned idx = 0; idx < table->size; ++idx){
-	//   node = table->elems[idx];
-	//   if(node->data == NULL){
-	//     free(node);
-	//     break;
-	//   }
-	//   while (node){
-	//     table->destr(node->data);
-	//     aux = node;
-	//     node = node->;
-	//     free(aux);
-	//   }
-	// }
-	for (unsigned idx = 0; idx < table->size; ++idx){
-		list_destroy(table->elems[idx]);
-	}
-	lru_destroy(table->lru);
-		
-	// Liberar el arreglo de casillas y la tabla.
-	free(table->elems);
-	free(table);
-	return;
+	for(int i = 0; i < table->size; i++){
+    list_destroy(table->lists[i]);
+  }
+  lru_destroy(table->lru);
+  free(table->lists);
+  free(table->lists_locks);
+  free(table->lru_lock);
+  free(table);
 }
 
 /**
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
  * buscado no se encuentra en la tabla.
  */
-void *hashtable_search(HashTable table, unsigned hashedValue, void *data) {
+void *hashtable_search(HashTable table, void *key, void *value) {
 
-	return list_get(table->elems[hashedValue], data, table->comp);
+	return list_get(table->lists[hashedValue], data, table->comp);
 }
 
 /**
