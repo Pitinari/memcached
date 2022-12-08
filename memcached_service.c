@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include "memcached_service.h"
-#include "./structure_lock/rwlock.h"
 
 Memcached memcached_create(unsigned size, ComparativeFunctionHash comp,
                          DestructiveFunctionHash destr, HashFunction hash){

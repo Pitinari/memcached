@@ -1,4 +1,5 @@
 #include "hash_table_with_lru.h"
+#include "utils/hash.h"
 
 #include <stdlib.h>
 #include <math.h>
@@ -7,7 +8,11 @@
 /**
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
-HashTable create_hashtable(unsigned size) {
+HashTable create_hashtable(
+  unsigned size,
+  HashFunction hash,
+  ComparativeFunction comp
+) {
 
 	// Pedimos memoria para la estructura principal y las casillas.
 	HashTable table = malloc(sizeof(struct _HashTable));
@@ -40,6 +45,8 @@ HashTable create_hashtable(unsigned size) {
   if(!table->lru) goto error6;
 
 	table->size = size;
+  table->hash = hash;
+  table->comp = comp;
 
 	return table;
 
@@ -136,27 +143,39 @@ void hashtable_destroy(HashTable table) {
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
  * buscado no se encuentra en la tabla.
  */
-void *hashtable_search(HashTable table, void *key, void *value) {
-
-	return list_get(table->lists[hashedValue], data, table->comp);
+void *hashtable_search(HashTable table, void *key) {
+  unsigned hashedValue = table->hash(key);
+  unsigned idx = hashedValue % table->size;
+  struct _NodeHT data = { key, NULL, hashedValue };
+  pthread_mutex_lock(table->lists_locks[idx]);
+	NodeHT returnValue = (NodeHT)list_get(table->lists[idx], (void *)&data, table->comp);
+  pthread_mutex_unlock(table->lists_locks[idx]);
+  return returnValue ? returnValue->value : NULL;
 }
 
 /**
  * tablahash_insertar: TablaHash *void -> void
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
-void hashtable_insert(HashTable table, unsigned hashedValue, void *data) {
-
-	list_put(table->elems[hashedValue], table->lru, data, custom_malloc, table->comp, table->destr);
-	table->numElems++;
+void hashtable_insert(HashTable table, void *key, void *value) {
+  unsigned hashedValue = table->hash(key);
+  unsigned idx = hashedValue % table->size;
+  NodeHT data = nodeht_create(table, key, value, hashedValue);
+  pthread_mutex_lock(table->lists_locks[idx]);
+	list_put(table->lists[idx], table->lru, (void *)&data, table->comp);
+  pthread_mutex_unlock(table->lists_locks[idx]);
 }
 
 /**
  * tablahash_eliminar: TablaHash *void -> void
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void hashtable_delete(HashTable table, unsigned hashedValue, void *data) {
-
-	list_delete(table->elems[hashedValue], table->lru, data, table->comp);
-
+void *hashtable_delete(HashTable table, void *key) {
+  unsigned hashedValue = table->hash(key);
+  unsigned idx = hashedValue % table->size;
+  struct _NodeHT data = { key, NULL, hashedValue };
+  pthread_mutex_lock(table->lists_locks[idx]);
+	NodeHT returnValue = (NodeHT)list_delete(table->lists[idx], table->lru, (void *)&data, table->comp);
+  pthread_mutex_unlock(table->lists_locks[idx]);
+  return returnValue;
 }

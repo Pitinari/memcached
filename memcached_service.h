@@ -1,9 +1,9 @@
 #ifndef __MEMCACHED_H__
 #define __MEMCACHED_H__
 
-#include "./structures/concurrent_hash_table_with_lru.h"
+#include "./structures/hash_table_with_lru.h"
 
-typedef ConcurrentHashTableWithLRU* Memcached; 
+typedef HashTable* Memcached; 
 
 Memcached memcached_create(unsigned size_hashtable, ComparativeFunctionHash comp_hashtable,
                          DestructiveFunctionHash destr_hashtable, HashFunction hash);

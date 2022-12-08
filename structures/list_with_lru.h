@@ -59,9 +59,7 @@ void list_put(
 	List list, 
 	LRU lru, 
 	void *data,
-	AllocationFunction custom_malloc,
-	ComparativeFunction comp,
-	DestructiveFunction dest
+	ComparativeFunction comp
 );
 
 void* list_delete(

@@ -17,6 +17,8 @@ struct _HashTable {
   LRU lru;
   pthread_mutex_t *lru_lock;
   unsigned size;
+  HashFunction hash;
+  ComparativeFunction comp;
 };
 
 typedef struct _HashTable *HashTable;
@@ -32,7 +34,11 @@ typedef struct _NodeHT *NodeHT;
 /**
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
-HashTable create_hashtable(unsigned size);
+HashTable create_hashtable(
+  unsigned size,
+  HashFunction hash,
+  ComparativeFunction comp
+);
 
 /**
  * Retorna el numero de elementos de la tabla.
@@ -58,12 +64,12 @@ void hashtable_insert(HashTable table, void *key, void *value);
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
  * buscado no se encuentra en la tabla.
  */
-void *hashtable_search(HashTable table, unsigned hashedValue, void *data);
+void *hashtable_search(HashTable table, void *key);
 
 /**
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void *hashtable_delete(HashTable table, void *key, void *value);
+void *hashtable_delete(HashTable table, void *key);
 
 void *custom_malloc(HashTable hashTable, size_t size);
 
