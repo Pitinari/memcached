@@ -28,6 +28,10 @@ typedef List (*InitDeallocateFunctionLRU)(void *forwardRef, void *data, List cur
 /** preprocessing deallocate */
 typedef void (*EndDeallocateFunctionLRU)(void *forwardRef, void *data, List currentList);
 /** postprocessing deallocate */
+typedef void (*OnAddElementLRU)(void *forwardRef);
+/** on add element of the LRU */
+typedef void (*OnDeleteElementLRU)(void *forwardRef);
+/** on delete elemtent of the LRU */
 
 struct _LRU {
 	NodeLL rear, front;
@@ -35,6 +39,8 @@ struct _LRU {
 	DestructiveFunction dest;
 	InitDeallocateFunctionLRU preprocessing;
 	EndDeallocateFunctionLRU postprocessing;
+	OnAddElementLRU on_add_element;
+	OnDeleteElementLRU on_delete_element;
 	void *forwardRef;
 };
 
@@ -52,6 +58,8 @@ LRU lru_create(
 	DestructiveFunction dest,
 	InitDeallocateFunctionLRU preprocessing,
 	EndDeallocateFunctionLRU postprocessing,
+	OnAddElementLRU on_add_element,
+	OnDeleteElementLRU on_delete_element,
 	void *forwardRef
 );
 

@@ -1,50 +1,64 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "memcached_service.h"
 
-Memcached memcached_create(unsigned size, ComparativeFunctionHash comp,
-                         DestructiveFunctionHash destr, HashFunction hash){
-    struct rw_lock lock;
-    rw_lock_init(&lock);
-    HashTable table = create_hashtable(size, comp, destr, custom_alloc);
-    Memcached mc = malloc(sizeof(ConcurrentHashTableWithLRU));
-    mc->hashtable = table;
-    mc->lock = &lock;
+Memcached memcached_create(
+    unsigned size,
+    HashFunction hash
+){
+    Memcached mc = malloc(sizeof(struct _Memcached));
+    if(!mc) goto error1;
+    mc->ht = create_hashtable(size, hash);
+    if(!mc->ht) goto error2;
+    mc->puts = ATOMIC_VAR_INIT(0);
+    mc->dels = ATOMIC_VAR_INIT(0);
+    mc->gets = ATOMIC_VAR_INIT(0);
+    mc->takes = ATOMIC_VAR_INIT(0);
+
     return mc;
+
+    error2:
+    free(mc);
+    error1:
+    return NULL;
 }
 
-int memcached_put(Memcached table, void* key, void *data) {
-    int idx = table->hashtable->hash(key) % table->hashtable->size;
-    concurrent_hashtable_insert(*table, idx, data);
+int memcached_put(Memcached mc, void* key, unsigned keyLen, void *data) {
+    atomic_fetch_add(&mc->puts, 1);
+    hashtable_insert(mc->ht, key, data, keyLen);
+    return 0;
 }
 
-void *memcached_get(Memcached table, void *key) {
-    int idx = table->hashtable->hash(key) % table->hashtable->size;
-    concurrent_hashtable_get(*table, idx, key);
+void *memcached_get(Memcached mc, void *key, unsigned keyLen) {
+    atomic_fetch_add(&mc->gets, 1);
+    return hashtable_search(mc->ht, key, keyLen);
 }
 
-void *memcached_take(Memcached table, void *key) {
-    int idx = table->hashtable->hash(key) % table->hashtable->size;
-    void *res = concurrent_hashtable_take(*table, idx, key);
-    return res;
+void *memcached_take(Memcached mc, void *key, unsigned keyLen) {
+    atomic_fetch_add(&mc->takes, 1);
+    return hashtable_delete(mc->ht, key, keyLen);
 }
 
-int memcached_delete(Memcached table, void *key) {
-    int idx = table->hashtable->hash(key) % table->hashtable->size;
-    void* res = concurrent_hashtable_take(*table, idx, key);
-    if (res == NULL) {
+int memcached_delete(Memcached mc, void *key, unsigned keyLen) {
+    atomic_fetch_add(&mc->dels, 1);
+    NodeHT node = hashtable_delete(mc->ht, key, keyLen);
+    if(node) {
+        nodeht_destroy(node);
         return 0;
     }
-    else {
-        return 1;
-    }
+    return 1;
 }
 
-char *memcached_stats(Memcached table);
+char *memcached_stats(Memcached mc){
+    char *str = custom_malloc(mc->ht, 100);
+    sprintf(
+        str, 
+        "OK PUTS=%u DELS=%u TAKES=%u GETS=%u KEYS=%u", 
+        mc->puts, mc->dels, mc->takes, mc->gets, mc->ht->numElems);
+    return str;
+}
 
-int memcached_destroy(Memcached table) {
-    for (unsigned i = 0; i < table->hashtable->size; i++) {
-        list_destroy(table->hashtable->elems[i]);
-    }
-    //finalizar lock
-    free(table);
+int memcached_destroy(Memcached mc) {
+    hashtable_destroy(mc->ht);
+    free(mc);
 }

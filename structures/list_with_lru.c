@@ -28,6 +28,8 @@ LRU lru_create(
 	DestructiveFunction dest,
 	InitDeallocateFunctionLRU preprocessing,
 	EndDeallocateFunctionLRU postprocessing,
+	OnAddElementLRU on_add_element,
+	OnDeleteElementLRU on_delete_element,
 	void *forwardRef
 ){
 	LRU lru = (LRU) malloc(sizeof(struct _LRU));
@@ -36,9 +38,11 @@ LRU lru_create(
 		lru->rear = NULL;
 		lru->custom_malloc = custom_malloc;
 		lru->dest = dest;
-		lru->preprocessing;
-		lru->postprocessing;
-		lru-> forwardRef;
+		lru->preprocessing = preprocessing;
+		lru->postprocessing = postprocessing;
+		lru->on_add_element = on_add_element;
+		lru->on_delete_element = on_delete_element;
+		lru->forwardRef;
 	}
 	return lru;
 }
@@ -84,6 +88,7 @@ void list_put(
 			list->rear->nextLRU = lru->front;
 			lru->front = list->rear;
 			lru->front->nextLRU->backLRU = lru->front;
+			lru->on_add_element(lru->forwardRef);
 		}
 	}
 }
@@ -125,6 +130,7 @@ void* list_delete(
 			if(temp == list->rear){
 				list->rear = temp->backList;
 			}
+			lru->on_delete_element(lru->forwardRef);
 			free(temp);
 			return returnData;
 		}
@@ -175,6 +181,7 @@ bool lru_deallocate(LRU lru, List currentList){
 
 			temp = lru->rear;
 			lru->postprocessing(lru->forwardRef, temp->data, currentList);
+			lru->on_delete_element(lru->forwardRef);
 		}
 		if(temp) {
 			temp->nextLRU = NULL;

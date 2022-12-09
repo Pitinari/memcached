@@ -3,21 +3,32 @@
 
 #include "./structures/hash_table_with_lru.h"
 
-typedef HashTable* Memcached; 
+struct _Memcached {
+    HashTable ht;
+    atomic_uint puts;
+    atomic_uint dels;
+    atomic_uint gets;
+    atomic_uint takes;
+};
 
-Memcached memcached_create(unsigned size_hashtable, ComparativeFunctionHash comp_hashtable,
-                         DestructiveFunctionHash destr_hashtable, HashFunction hash);
+typedef struct _Memcached *Memcached; 
 
-int memcached_put(Memcached table, void* key, void *data);
+Memcached memcached_create(
+    unsigned size_hashtable, 
+    ComparativeFunction comp_hashtable,
+    HashFunction hash
+);
 
-void *memcached_get(Memcached table, void *key);
+int memcached_put(Memcached mc, void* key, unsigned keyLen, void *data);
 
-void *memcached_take(Memcached table, void *key);
+void *memcached_get(Memcached mc, void *key, unsigned keyLen);
 
-int memcached_delete(Memcached table, void *data);
+void *memcached_take(Memcached mc, void *key, unsigned keyLen);
 
-char *memcached_stats(Memcached table);
+int memcached_delete(Memcached mc, void *key, unsigned keyLen);
 
-int memcached_destroy(Memcached table);
+char *memcached_stats(Memcached mc);
+
+int memcached_destroy(Memcached mc);
 
 #endif /* __MEMCACHED_H__ */

@@ -2,6 +2,7 @@
 #define __HASHTABLE_H__
 
 #include <stdbool.h>
+#include <stdatomic.h>
 #include "list_with_lru.h"
 
 typedef void *(*AlloccateFunctionHash)(size_t size);
@@ -17,14 +18,15 @@ struct _HashTable {
   LRU lru;
   pthread_mutex_t *lru_lock;
   unsigned size;
+  atomic_int numElems;
   HashFunction hash;
-  ComparativeFunction comp;
 };
 
 typedef struct _HashTable *HashTable;
 
 struct _NodeHT {
   void *key;
+  unsigned keyLen;
   void *value;
   unsigned hashedKey;
 };
@@ -36,19 +38,13 @@ typedef struct _NodeHT *NodeHT;
  */
 HashTable create_hashtable(
   unsigned size,
-  HashFunction hash,
-  ComparativeFunction comp
+  HashFunction hash
 );
 
 /**
  * Retorna el numero de elementos de la tabla.
  */
 unsigned hashtable_nelems(HashTable table);
-
-/**
- * Retorna la capacidad de la tabla.
- */
-unsigned hashtable_size(HashTable table);
 
 /**
  * Destruye la tabla.
@@ -58,19 +54,21 @@ void hashtable_destroy(HashTable table);
 /**
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
-void hashtable_insert(HashTable table, void *key, void *value);
+void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value);
 
 /**
  * Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
  * buscado no se encuentra en la tabla.
  */
-void *hashtable_search(HashTable table, void *key);
+void *hashtable_search(HashTable table, void *key, unsigned keyLen);
 
 /**
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void *hashtable_delete(HashTable table, void *key);
+void *hashtable_delete(HashTable table, void *key, unsigned keyLen);
 
 void *custom_malloc(HashTable hashTable, size_t size);
+
+void nodeht_destroy(NodeHT node);
 
 #endif /* __HASHTABLE_H__ */
