@@ -160,9 +160,9 @@ bool lru_deallocate(LRU lru, List currentList){
 	if(lru->rear != NULL) {
 		int alreadyDeallocated = 0;
 		NodeLL temp = lru->rear;
-		List currentList = NULL;
+		List currentListDeallocation = NULL;
 		while(temp || alreadyDeallocated >= 10) {
-			currentList = lru->preprocessing(lru->forwardRef, temp->data, currentList);
+			currentListDeallocation = lru->preprocessing(lru->forwardRef, temp->data, currentList);
 			lru->dest(temp->data);
 			lru->rear = temp->backLRU;
 
@@ -172,11 +172,11 @@ bool lru_deallocate(LRU lru, List currentList){
 			if(temp->backList){
 				temp->backList->nextList = temp->nextList;
 			}
-			if(currentList->front == temp){
-				currentList->front = temp->nextList;
+			if(currentListDeallocation->front == temp){
+				currentListDeallocation->front = temp->nextList;
 			}
-			if(currentList->rear == temp){
-				currentList->rear = temp->backList;
+			if(currentListDeallocation->rear == temp){
+				currentListDeallocation->rear = temp->backList;
 			}
 
 			temp = lru->rear;

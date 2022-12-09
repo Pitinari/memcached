@@ -15,7 +15,6 @@ typedef struct _Memcached *Memcached;
 
 Memcached memcached_create(
     unsigned size_hashtable, 
-    ComparativeFunction comp_hashtable,
     HashFunction hash
 );
 

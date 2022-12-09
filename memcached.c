@@ -60,14 +60,14 @@ void binary(int fd, Memcached table) {
 
 	if (buf == PUT) {
 		int length = get_length(fd);
-		void *key = malloc(length);
+		void *key = custom_malloc(table->ht, length);
 		t = read(fd, key, length);
 
 		length = get_length(fd);
-		void *value = malloc(length);
+		void *value = custom_malloc(table->ht, length);
 		t = read(fd, value, length);
 
-		int i = memcached_put(table, key, value);
+		int i = memcached_put(table, key, length, value);
 		if (i == 0) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -75,7 +75,7 @@ void binary(int fd, Memcached table) {
 	} 
 	else if (buf == DEL)  {
 		int length = get_length(fd);
-		void *key = malloc(length);
+		void *key = custom_malloc(table->ht, length);
 		t = read(fd, key, length);
 
 		int i = memcached_delete(table, key);
@@ -89,7 +89,7 @@ void binary(int fd, Memcached table) {
 	} 
 	else if (buf == GET) {
 		int length = get_length(fd);
-		void *key = malloc(length);
+		void *key = custom_malloc(table->ht, length);
 		t = read(fd, key, length);
 
 		void *value = memcached_get(table, key);
@@ -105,10 +105,10 @@ void binary(int fd, Memcached table) {
 	} 
 	else if (buf == TAKE) {
 		int length = get_length(fd);
-		void *key = malloc(length);
+		void *key = custom_malloc(table->ht, length);
 		t = read(fd, key, length);
 
-		void *value = memcached_take(table, key);
+		void *value = memcached_take(table, key, length);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -159,14 +159,14 @@ void text(int fd, Memcached table) {
 		char *key = strtok(NULL, " ");
 		char *value = strtok(NULL, " ");
 
-		int i = memcached_put(table, key, value);
+		int i = memcached_put(table, key, strlen(key), value);
 		if (i == 0)
 			write(fd, "OK", 2);
 	} 
 	else if (strcmp(comm, "DEL") == 0) {
 		char *key = strtok(NULL, " ");
 
-		int i = memcached_del(key);
+		int i = memcached_delete(table, key, strlen(key));
 		if (i == 0) {
 			write(fd, "OK", 2);
 		} else {
@@ -176,9 +176,8 @@ void text(int fd, Memcached table) {
 	else if (strcmp(comm, "GET") == 0) {
 		char *key = strtok(NULL, " ");
 
-		void *value;
-		int i = memcached_get(table, key);
-		if (i == 0) {
+		char *value = memcached_get(table, key, strlen(key));
+		if (value) {
 			if (1/*representable*/) {
 				write(fd, "OK ", 3);
 				write(fd, value, strlen(value));
@@ -194,9 +193,8 @@ void text(int fd, Memcached table) {
 	else if (strcmp(comm, "TAKE") == 0) {
 		char *key = strtok(NULL, " ");
 
-		void *value;
-		int i = memcached_take(table, key);
-		if (i == 0) {
+		char *value = memcached_take(table, key, strlen(key));
+		if (value) {
 			if (1/*representable*/) {
 				write(fd, "OK ", 3);
 				write(fd, value, strlen(value));
@@ -204,6 +202,7 @@ void text(int fd, Memcached table) {
 			else {
 				write(fd, "EBINARY", 7);
 			}
+			free(value);
 		} else {
 			write(fd, "ENOTFOUND", 9);
 		}

@@ -27,43 +27,33 @@ static void die(char *s, ...) {
 	abort();
 }
 
-int create_sock(char *host, char *port) {
-	int sock, ret;
-	struct sockaddr_in addr;
-	struct addrinfo *gai, hints;
+int create_sock(char *port) {
+	struct sockaddr_in sa;
+	int lsock;
+	int rc;
+	int yes = 1;
 
-	sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock < 0)
-		die("socket");
+	/* Crear socket */
+	lsock = socket(AF_INET, SOCK_STREAM, 0);
+	if (lsock < 0) quit("socket");
 
-	memset(&hints, 0, sizeof hints);
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
+	/* Setear opción reuseaddr... normalmente no es necesario */
+	if (setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == 1)
+		quit("setsockopt");
 
-	/*
-	 * Consultamos la información sobre la dirección que nos
-	 * dieron. Podemos pasar una IP, o un nombre que será
-	 * consultado a /etc/hosts o al nameserver configurado
-	 */
-	ret = getaddrinfo(host, port, &hints, &gai);
-	if (ret)
-		die("getaddrinfo (%s)", gai_strerror(ret));
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(port);
+	sa.sin_addr.s_addr = htonl(INADDR_ANY);
 
-	/*
-	 * getaddrinfo devuelve una lista enlazada con
-	 * información, tomamos el primer nodo
-	 */
+	/* Bindear al puerto 4040 TCP, en todas las direcciones disponibles */
+	rc = bind(lsock, (struct sockaddr *)&sa, sizeof sa);
+	if (rc < 0) quit("bind");
 
-	addr = *(sin*)gai->ai_addr;
+	/* Setear en modo escucha */
+	rc = listen(lsock, 10);
+	if (rc < 0) quit("listen");
 
-	freeaddrinfo(gai);
-
-	/* Conectamos a esa dirección */
-	ret = connect(sock, (sad*)&addr, sizeof addr);
-	if (ret < 0)
-		die("connect");
-
-	return sock;
+	return lsock;
 }
 
 void loop(int epfd, int sock1, int sock2, Memcached mc) {
@@ -101,8 +91,8 @@ again:
 int main() {
 	int sock1, sock2;
 
-	sock1 = create_sock("1", "888");
-	sock2 = create_sock("1", "889");
+	sock1 = create_sock("888");
+	sock2 = create_sock("889");
 
 	int epfd = epoll_create(1);
 	if (epfd < 0)
@@ -117,7 +107,7 @@ int main() {
 		if (rc < 0)
 			die("epoll ctl");
 	}
-  {
+  	{
 		struct epoll_event ev2;
 		ev2.events = EPOLLIN;
 		ev2.data.fd = sock2;
@@ -144,7 +134,7 @@ int main() {
 			die("epoll ctl");
 	}
 
-  Memcached mc = memcached_create();
+  	Memcached mc = memcached_create(10000);
 	loop(epfd, sock1, sock2, mc);
 
 	return 0;

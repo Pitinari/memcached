@@ -85,7 +85,7 @@ bool comparate_keys(void *data1, void *data2){
     a->keyLen == b->keyLen &&
     a->hashedKey == b->hashedKey
   ){
-    return memcmp(a->key, b->key, a->keyLen) == 0 ? true : false;
+    return memcmp(a->key, b->key, a->keyLen) == 0;
   } 
   return false;
 }
