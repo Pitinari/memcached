@@ -12,7 +12,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include "memcached_service.h"
-#include "memcached.h"
+#include "memcached_controller.h"
 
 struct fdinfo {
 	enum {
@@ -78,7 +78,7 @@ void binary(int fd, Memcached table) {
 		void *key = custom_malloc(table->ht, length);
 		t = read(fd, key, length);
 
-		int i = memcached_delete(table, key);
+		int i = memcached_delete(table, key, length);
 		if (i == 0) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -92,7 +92,7 @@ void binary(int fd, Memcached table) {
 		void *key = custom_malloc(table->ht, length);
 		t = read(fd, key, length);
 
-		void *value = memcached_get(table, key);
+		void *value = memcached_get(table, key, length);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);

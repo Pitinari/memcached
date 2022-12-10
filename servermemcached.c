@@ -9,7 +9,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <stdlib.h>
-#include "memcached.h"
+#include "memcached_controller.h"
 
 typedef struct sockaddr_in sin;
 typedef struct sockaddr    sad;
@@ -95,8 +95,7 @@ int main() {
 	sock2 = create_sock("889");
 
 	int epfd = epoll_create(1);
-	if (epfd < 0)
-		die("epoll");
+	if (epfd < 0) die("epoll");
 
 	/* Registrar los sockets */
 	{
