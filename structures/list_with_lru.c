@@ -197,10 +197,10 @@ void list_destroy(List list){
 
 void lru_destroy(LRU lru){
 	NodeLL current = lru->front;
-	while (current) {
+	while (lru->front) {
 		lru->dest(current->data);
-		current = lru->front->nextLRU;
-		free(lru->front);
+		lru->front = current->nextLRU;
+		free(current);
 	}
 	free(lru);
 }
