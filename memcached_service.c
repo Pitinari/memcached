@@ -33,7 +33,7 @@ void *memcached_get(Memcached mc, void *key, unsigned keyLen) {
 
 void *memcached_take(Memcached mc, void *key, unsigned keyLen) {
     atomic_fetch_add(&mc->takes, 1);
-    NodeHT node = hashtable_delete(mc->ht, key, keyLen);
+    NodeHT node = hashtable_take(mc->ht, key, keyLen);
     void *value = node->value;
     free(node->key);
     free(node);
@@ -42,7 +42,7 @@ void *memcached_take(Memcached mc, void *key, unsigned keyLen) {
 
 int memcached_delete(Memcached mc, void *key, unsigned keyLen) {
     atomic_fetch_add(&mc->dels, 1);
-    NodeHT node = hashtable_delete(mc->ht, key, keyLen);
+    NodeHT node = hashtable_take(mc->ht, key, keyLen);
     if(node) {
         nodeht_destroy(node);
         return 0;

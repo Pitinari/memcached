@@ -93,7 +93,7 @@ void list_put(
 	}
 }
 
-void* list_delete(
+void* list_take(
 	List list, 
 	LRU lru, 
 	void *data,

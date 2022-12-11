@@ -116,14 +116,24 @@ again:
 	for (int i = 0; i < nev; i++) {
 		int fd = ev[i].data.fd;
 
-		if (fd == loopArgs.textSock || fd == loopArgs.textSock) {
+		if (fd == loopArgs.textSock || fd == loopArgs.binSock) {
 			int newSock = accept(fd, NULL, NULL);
 			register_fd(newSock, loopArgs.epfd, ((dataEvent)ev[i].data.ptr)->bin);
 			modify_fd(fd, loopArgs.epfd, ((dataEvent)ev[i].data.ptr)->bin);
 		} else {
 			if(((dataEvent)ev[i].data.ptr)->bin) {
+				char buf[200];
+				int n = read(0, buf, 200);
+				assert(n > 0);
+				/* De vuelta: asumo que no bloquea */
+				write(((args)arg)->binSock, buf, n);
 				binary(fd, loopArgs.mc);
 			} else {
+				char buf[200];
+				int n = read(0, buf, 200);
+				assert(n > 0);
+				/* De vuelta: asumo que no bloquea */
+				write(((args)arg)->textSock, buf, n);
 				text(fd, loopArgs.mc);
 			}
 		}
@@ -133,10 +143,12 @@ again:
 }
 
 int main() {
+
+
 	int sock1, sock2;
 
-	sock1 = create_sock(888);
-	sock2 = create_sock(889);
+	sock1 = create_sock(4040);
+	sock2 = create_sock(4041);
 
 	int epfd = epoll_create(1);
 	if (epfd < 0)
@@ -151,13 +163,13 @@ int main() {
 	}
 
 	pthread_t hand[N_THREADS];
-	args args;
-	args->epfd = epfd;
-	args->textSock = sock1;
-	args->binSock = sock2;
+	struct _args args;
+	args.epfd = epfd;
+	args.textSock = sock1;
+	args.binSock = sock2;
 	
 	for (size_t i = 0; i < N_THREADS; i++) {
-		pthread_create(&hand[i], NULL, loop, (void *)args);
+		pthread_create(&hand[i], NULL, loop, (void *)&args);
 	}
 	
 	for (size_t i = 0; i < N_THREADS; i++) {

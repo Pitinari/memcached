@@ -70,7 +70,7 @@ void list_put(
 	ComparativeFunction comp
 );
 
-void* list_delete(
+void* list_take(
 	List list, 
 	LRU lru, 
 	void *data,

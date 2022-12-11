@@ -61,7 +61,7 @@ void *hashtable_search(HashTable table, void *key, unsigned keyLen);
 /**
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void *hashtable_delete(HashTable table, void *key, unsigned keyLen);
+void *hashtable_take(HashTable table, void *key, unsigned keyLen);
 
 void *custom_malloc(HashTable hashTable, size_t size);
 

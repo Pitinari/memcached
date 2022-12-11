@@ -197,7 +197,7 @@ void *hashtable_take(HashTable table, void *key, unsigned keyLen) {
   unsigned idx = hashedValue % table->size;
   struct _NodeHT data = { key, keyLen, NULL, hashedValue };
   pthread_mutex_lock(table->lists_locks[idx]);
-	NodeHT returnValue = (NodeHT)list_delete(table->lists[idx], table->lru, (void *)&data, comparate_keys);
+	NodeHT returnValue = (NodeHT)list_take(table->lists[idx], table->lru, (void *)&data, comparate_keys);
   pthread_mutex_unlock(table->lists_locks[idx]);
   return returnValue;
 }

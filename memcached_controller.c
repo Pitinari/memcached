@@ -96,7 +96,7 @@ void binary(int fd, Memcached table) {
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
-			write(fd, value, len(value));
+			write(fd, value, strlen(value));
 		} 
 		else {
 			int code = ENOTFOUND;
@@ -112,7 +112,7 @@ void binary(int fd, Memcached table) {
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
-			write(fd, value, len(value));
+			write(fd, value, strlen(value));
 		} else {
 			int code = ENOTFOUND;
 			write(fd, &code, 1);
@@ -120,7 +120,7 @@ void binary(int fd, Memcached table) {
 	} 
 	else if (buf == STATS) {
 		char* line = memcached_stats(table);
-		write(fd, line, len(line));
+		write(fd, line, strlen(line));
 		free(line);
 	} 
 	else {
@@ -214,8 +214,4 @@ void text(int fd, Memcached table) {
 	else {
 		write(fd, "EINVAL", 6);
 	}
-}
-
-int main() {
-
 }
