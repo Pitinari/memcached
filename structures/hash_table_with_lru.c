@@ -119,11 +119,14 @@ void *custom_malloc(HashTable hashTable, size_t size){
 
 void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList){
   void *mem;
-  while(mem = malloc(size)) {
+  int numberTries = 0;
+  while((mem = malloc(size)) == NULL && numberTries < 10) {
     pthread_mutex_lock(&((HashTable)hashTable)->lru_lock);
     lru_deallocate(((HashTable)hashTable)->lru, currentList);
     pthread_mutex_unlock(&((HashTable)hashTable)->lru_lock);
+    numberTries++;
   }
+  return mem;
 }
 
 List lru_preprocessing(void *hashTable, void *data, List currentList){

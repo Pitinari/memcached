@@ -19,23 +19,38 @@ typedef struct sockaddr_in sin;
 typedef struct sockaddr    sad;
 struct _args {
 	int epfd;
-	int sock;
-	int mode;
+	int binSock;
+	int textSock;
+	Memcached mc;
 };
+
 typedef struct _args *args;
+
+struct _dataEvent {
+	bool bin;
+};
+
+typedef struct _dataEvent *dataEvent;
 
 #define N_THREADS 10
 
-/*
- * Para probar, usar netcat. Ej:
- *
- *      $ nc localhost 4040
- *      NUEVO
- *      0
- *      NUEVO
- *      1
- *      CHAU
-*/
+int register_fd(int epfd, int fd, bool bin) {
+	struct epoll_event ev;
+	struct _dataEvent type = {bin};
+	ev.events = EPOLLIN | EPOLLONESHOT;
+	ev.data.fd = fd;
+	ev.data.ptr = (void *)&type;
+	return epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+}
+
+int modify_fd(int epfd, int fd, bool bin) {
+	struct epoll_event ev;
+	struct _dataEvent type = {bin};
+	ev.events = EPOLLIN | EPOLLONESHOT;
+	ev.data.fd = fd;
+	ev.data.ptr = (void *)&type;
+	return epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
+}
 
 static void die(char *s, ...)
 {
@@ -83,9 +98,10 @@ int create_sock(int port) {
 void *loop(void* arg) {
 	int nev;
 	struct epoll_event ev[16];
+	struct _args loopArgs = *(args)arg;
 
 again:
-	nev = epoll_wait(((args)arg)->epfd, ev, 16, -1);
+	nev = epoll_wait(loopArgs.epfd, ev, 16, -1);
 	if (nev < 0) {
 		if (errno == EINTR) {
 			fprintf(stderr, "eintr!!\n");
@@ -100,21 +116,16 @@ again:
 	for (int i = 0; i < nev; i++) {
 		int fd = ev[i].data.fd;
 
-		if (fd == 0) {
-			char buf[200];
-			int n = read(0, buf, 200);
-			assert(n > 0);
-			/* De vuelta: asumo que no bloquea */
-			write(((args)arg)->sock, buf, n);
-		} else if (fd == ((args)arg)->sock) {
-			if (((args)arg)->mode == 0) {
-				/*text(fd, table)*/
-			}
-			else {
-				/*binary(fd, table)*/
-			}
+		if (fd == loopArgs.textSock || fd == loopArgs.textSock) {
+			int newSock = accept(fd, NULL, NULL);
+			register_fd(newSock, loopArgs.epfd, ((dataEvent)ev[i].data.ptr)->bin);
+			modify_fd(fd, loopArgs.epfd, ((dataEvent)ev[i].data.ptr)->bin);
 		} else {
-			die("otro fd??");
+			if(((dataEvent)ev[i].data.ptr)->bin) {
+				binary(fd, loopArgs.mc);
+			} else {
+				text(fd, loopArgs.mc);
+			}
 		}
 	}
 
@@ -127,71 +138,30 @@ int main() {
 	sock1 = create_sock(888);
 	sock2 = create_sock(889);
 
-	int epfd1 = epoll_create(1);
-	if (epfd1 < 0)
-		die("epoll");
-
-	int epfd2 = epoll_create(1);
-	if (epfd2 < 0)
+	int epfd = epoll_create(1);
+	if (epfd < 0)
 		die("epoll");
 
 	/* Registrar los sockets */
-	{
-		struct epoll_event ev;
-		ev.events = EPOLLIN;
-		ev.data.fd = sock1;
-		int rc = epoll_ctl(epfd1, EPOLL_CTL_ADD, sock1, &ev);
-		if (rc < 0)
-			die("epoll ctl");
+	if(register_fd(epfd, sock1, false) < 0){
+		die("error on register text socket");
 	}
-	{
-		struct epoll_event ev;
-		ev.events = EPOLLIN;
-		ev.data.fd = sock2;
-		int rc = epoll_ctl(epfd2, EPOLL_CTL_ADD, sock2, &ev);
-		if (rc < 0)
-			die("epoll ctl");
+	if(register_fd(epfd, sock2, true) < 0) {
+		die("error on register bin socket");
 	}
 
-	/* Registrar stdin */
-	{
-		struct epoll_event ev;
-		ev.events = EPOLLIN;
-		ev.data.fd = 0;
-		int rc = epoll_ctl(epfd1, EPOLL_CTL_ADD, 0, &ev);
-		if (rc < 0)
-			die("epoll ctl");
-	}
-	{
-		struct epoll_event ev;
-		ev.events = EPOLLIN;
-		ev.data.fd = 0;
-		int rc = epoll_ctl(epfd2, EPOLL_CTL_ADD, 0, &ev);
-		if (rc < 0)
-			die("epoll ctl");
-	}
-
-	pthread_t hand[N_THREADS*2];
-	args args1, args2;
-	args1->epfd = epfd1;
-	args2->epfd = epfd2;
-	args1->sock = sock1;
-	args2->sock = sock2;
-	args1->mode = 0;
-	args2->mode = 1;
+	pthread_t hand[N_THREADS];
+	args args;
+	args->epfd = epfd;
+	args->textSock = sock1;
+	args->binSock = sock2;
 	
 	for (size_t i = 0; i < N_THREADS; i++) {
-		pthread_create(&hand[i], NULL, loop, (void *)args1);
-	}
-	for (size_t i = 0; i < N_THREADS; i++) {
-		pthread_create(&hand[N_THREADS+i], NULL, loop, (void *)args2);
+		pthread_create(&hand[i], NULL, loop, (void *)args);
 	}
 	
 	for (size_t i = 0; i < N_THREADS; i++) {
 		pthread_join(hand[i], NULL);
-	}
-	for (size_t i = 0; i < N_THREADS; i++) {
-		pthread_join(hand[N_THREADS +i], NULL);
 	}
 
 	return 0;

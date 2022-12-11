@@ -42,7 +42,7 @@ LRU lru_create(
 		lru->postprocessing = postprocessing;
 		lru->on_add_element = on_add_element;
 		lru->on_delete_element = on_delete_element;
-		lru->forwardRef;
+		lru->forwardRef = forwardRef;
 	}
 	return lru;
 }
