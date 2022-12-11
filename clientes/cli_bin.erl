@@ -75,6 +75,6 @@ stats(Sock) ->
 
 
 start() ->
-  gen_tcp:connect(889, [binary, {packet, 0}]). % retorna {ok, Sock} si funciona bien
+  gen_tcp:connect("localhost", 888, [binary, {packet, 0}]). % retorna {ok, Sock} si funciona bien
 
 close(Sock) -> gen_tcp:close(Sock).

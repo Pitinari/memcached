@@ -39,7 +39,7 @@ int get_length(int fd) {
 }
 
 // Handler de una conexion a cliente en modo binario
-void binary(int fd, Memcached table) {
+void binary_handler(int fd, Memcached table) {
 	int t;
 	int buf;
 	t = read(fd, &buf, 1);
@@ -131,7 +131,7 @@ void binary(int fd, Memcached table) {
 }
 
 // Handler de una conexion a cliente en modo texto
-void text(int fd, Memcached table) {
+void text_handler(int fd, Memcached table) {
 	int t;
 	char /*buf1[2048],*/ input[2048];
 

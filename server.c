@@ -125,16 +125,14 @@ again:
 				char buf[200];
 				int n = read(0, buf, 200);
 				assert(n > 0);
-				/* De vuelta: asumo que no bloquea */
 				write(((args)arg)->binSock, buf, n);
-				binary(fd, loopArgs.mc);
+				//binary_handler(fd, loopArgs.mc);
 			} else {
 				char buf[200];
 				int n = read(0, buf, 200);
 				assert(n > 0);
-				/* De vuelta: asumo que no bloquea */
 				write(((args)arg)->textSock, buf, n);
-				text(fd, loopArgs.mc);
+				//text_handler(fd, loopArgs.mc);
 			}
 		}
 	}
