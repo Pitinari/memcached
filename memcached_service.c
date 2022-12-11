@@ -2,13 +2,10 @@
 #include <stdio.h>
 #include "memcached_service.h"
 
-Memcached memcached_create(
-    unsigned size,
-    HashFunction hash
-){
+Memcached memcached_create(unsigned size){
     Memcached mc = malloc(sizeof(struct _Memcached));
     if(!mc) goto error1;
-    mc->ht = create_hashtable(size, hash);
+    mc->ht = create_hashtable(size);
     if(!mc->ht) goto error2;
     mc->puts = ATOMIC_VAR_INIT(0);
     mc->dels = ATOMIC_VAR_INIT(0);
@@ -23,9 +20,9 @@ Memcached memcached_create(
     return NULL;
 }
 
-int memcached_put(Memcached mc, void* key, unsigned keyLen, void *data) {
+int memcached_put(Memcached mc, void* key, unsigned keyLen, void *value) {
     atomic_fetch_add(&mc->puts, 1);
-    hashtable_insert(mc->ht, key, data, keyLen);
+    hashtable_insert(mc->ht, key, keyLen, value);
     return 0;
 }
 

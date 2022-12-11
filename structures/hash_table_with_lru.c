@@ -1,17 +1,56 @@
 #include <stdlib.h>
 #include <math.h>
-#include "pthread.h"
 #include "string.h"
 
 #include "hash_table_with_lru.h"
-#include "utils/hash.h"
+#include "../utils/hash.h"
+
+void on_add_element(void *hashTable){
+  atomic_fetch_add(&((HashTable)hashTable)->numElems, 1);
+}
+
+void on_delete_element(void *hashTable){
+  atomic_fetch_sub(&((HashTable)hashTable)->numElems, 1);
+}
+
+void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList){
+  void *mem;
+  int numberTries = 0;
+  while((mem = malloc(size)) == NULL && numberTries < 10) {
+    pthread_mutex_lock(((HashTable)hashTable)->lru_lock);
+    lru_deallocate(((HashTable)hashTable)->lru, currentList);
+    pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
+    numberTries++;
+  }
+  return mem;
+}
+
+List lru_preprocessing(void *hashTable, void *data, List currentList){
+  int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
+  List list = ((HashTable)hashTable)->lists[idx];
+  if(list != currentList) {
+    pthread_mutex_lock(((HashTable)hashTable)->lists_locks[idx]);
+  }
+  return list;
+}
+
+void lru_postprocessing(void *hashTable, void *data, List currentList){
+  int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
+  List list = ((HashTable)hashTable)->lists[idx];
+  if(list != currentList) {
+    pthread_mutex_unlock(((HashTable)hashTable)->lists_locks[idx]);
+  }
+}
+
+void nodeht_destroy_wrapper(void *node){
+  nodeht_destroy((NodeHT)node);
+}
 
 /**
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
 HashTable create_hashtable(
-  unsigned size,
-  HashFunction hash
+  unsigned size
 ) {
 
 	// Pedimos memoria para la estructura principal y las casillas.
@@ -37,7 +76,7 @@ HashTable create_hashtable(
 
 	table->lru = lru_create(
     custom_malloc_wrapper, 
-    nodeht_destroy, 
+    nodeht_destroy_wrapper, 
     lru_preprocessing, 
     lru_postprocessing,
     on_add_element,
@@ -48,7 +87,6 @@ HashTable create_hashtable(
 
 	table->size = size;
 	table->numElems = ATOMIC_VAR_INIT(0);
-  table->hash = hash;
 
 	return table;
 
@@ -69,14 +107,6 @@ HashTable create_hashtable(
   free(table);
   error1:
   return NULL;
-}
-
-void on_add_element(void *hashTable){
-  atomic_fetch_add(&((HashTable)hashTable)->numElems, 1);
-}
-
-void on_delete_element(void *hashTable){
-  atomic_fetch_sub(&((HashTable)hashTable)->numElems, 1);
 }
 
 bool comparate_keys(void *data1, void *data2){
@@ -117,35 +147,6 @@ void *custom_malloc(HashTable hashTable, size_t size){
   return custom_malloc_wrapper((void *)hashTable, size, NULL);
 }
 
-void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList){
-  void *mem;
-  int numberTries = 0;
-  while((mem = malloc(size)) == NULL && numberTries < 10) {
-    pthread_mutex_lock(&((HashTable)hashTable)->lru_lock);
-    lru_deallocate(((HashTable)hashTable)->lru, currentList);
-    pthread_mutex_unlock(&((HashTable)hashTable)->lru_lock);
-    numberTries++;
-  }
-  return mem;
-}
-
-List lru_preprocessing(void *hashTable, void *data, List currentList){
-  int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
-  List list = ((HashTable)hashTable)->lists[idx];
-  if(list != currentList) {
-    pthread_mutex_lock(&((HashTable)hashTable)->lists_locks[idx]);
-  }
-  return list;
-}
-
-void lru_postprocessing(void *hashTable, void *data, List currentList){
-  int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
-  List list = ((HashTable)hashTable)->lists[idx];
-  if(list != currentList) {
-    pthread_mutex_unlock(&((HashTable)hashTable)->lists_locks[idx]);
-  }
-}
-
 /**
  * Destruye la tabla.
  */
@@ -165,7 +166,7 @@ void hashtable_destroy(HashTable table) {
  * buscado no se encuentra en la tabla.
  */
 void *hashtable_search(HashTable table, void *key, unsigned keyLen) {
-  unsigned hashedValue = table->hash(key);
+  unsigned hashedValue = hash_function(key, keyLen);
   unsigned idx = hashedValue % table->size;
   struct _NodeHT data = { key, keyLen, NULL, hashedValue };
   pthread_mutex_lock(table->lists_locks[idx]);
@@ -179,7 +180,7 @@ void *hashtable_search(HashTable table, void *key, unsigned keyLen) {
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
 void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value) {
-  unsigned hashedValue = table->hash(key);
+  unsigned hashedValue = hash_function(key, keyLen);
   unsigned idx = hashedValue % table->size;
   NodeHT data = nodeht_create(table, key, keyLen, value, hashedValue);
   pthread_mutex_lock(table->lists_locks[idx]);
@@ -191,8 +192,8 @@ void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value) 
  * tablahash_eliminar: TablaHash *void -> void
  * Elimina el dato de la tabla que coincida con el dato dado.
  */
-void *hashtable_delete(HashTable table, void *key, unsigned keyLen) {
-  unsigned hashedValue = table->hash(key);
+void *hashtable_take(HashTable table, void *key, unsigned keyLen) {
+  unsigned hashedValue = hash_function(key, keyLen);
   unsigned idx = hashedValue % table->size;
   struct _NodeHT data = { key, keyLen, NULL, hashedValue };
   pthread_mutex_lock(table->lists_locks[idx]);

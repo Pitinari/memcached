@@ -3,11 +3,11 @@
 
 #include <stdbool.h>
 #include <stdatomic.h>
+#include "pthread.h"
 #include "list_with_lru.h"
 
 typedef void *(*AlloccateFunctionHash)(size_t size);
 /** Retorna un entero sin signo para el dato */
-typedef unsigned (*HashFunction)(void *key);
 
 /**
  * Estructura principal que representa la tabla hash.
@@ -19,7 +19,6 @@ struct _HashTable {
   pthread_mutex_t *lru_lock;
   unsigned size;
   atomic_int numElems;
-  HashFunction hash;
 };
 
 typedef struct _HashTable *HashTable;
@@ -36,10 +35,7 @@ typedef struct _NodeHT *NodeHT;
 /**
  * Crea una nueva tabla hash vacia, con la capacidad dada.
  */
-HashTable create_hashtable(
-  unsigned size,
-  HashFunction hash
-);
+HashTable create_hashtable(unsigned size);
 
 /**
  * Retorna el numero de elementos de la tabla.

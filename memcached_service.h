@@ -13,10 +13,7 @@ struct _Memcached {
 
 typedef struct _Memcached *Memcached; 
 
-Memcached memcached_create(
-    unsigned size_hashtable, 
-    HashFunction hash
-);
+Memcached memcached_create(unsigned size_hashtable);
 
 int memcached_put(Memcached mc, void* key, unsigned keyLen, void *data);
 
