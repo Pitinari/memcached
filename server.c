@@ -121,12 +121,12 @@ again:
 	bool connection;
 	for (int i = 0; i < nev; i++) {
 		fd = ((dataEvent)ev[i].data.ptr)->fd;
-		fprintf(stderr, "socket registered. fd %i %i %i\n", loopArgs.textSock, loopArgs.binSock, fd);
+		// fprintf(stderr, "socket registered. fd %i %i %i\n", loopArgs.textSock, loopArgs.binSock, fd);
 		if (fd == loopArgs.textSock || fd == loopArgs.binSock) {
 			
 			newSock = accept(fd, NULL, NULL);
 			if(newSock < 0){
-				fprintf(stderr, "Error on create the socket. FD = %i\n", newSock);
+				// fprintf(stderr, "Error on create the socket. FD = %i\n", newSock);
 				continue;
 			}
 			register_fd(loopArgs.epfd, newSock, ((dataEvent)ev[i].data.ptr)->bin, loopArgs.mc);

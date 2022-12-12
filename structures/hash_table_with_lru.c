@@ -196,7 +196,7 @@ void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value) 
   unsigned idx = hashedValue % table->size;
   NodeHT data = nodeht_create(table, key, keyLen, value, hashedValue);
   pthread_mutex_lock(table->lists_locks[idx]);
-	list_put(table->lists[idx], table->lru, (void *)&data, comparate_keys);
+	list_put(table->lists[idx], table->lru, (void *)data, comparate_keys);
   pthread_mutex_unlock(table->lists_locks[idx]);
 }
 
