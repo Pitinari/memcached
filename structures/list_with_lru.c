@@ -63,6 +63,7 @@ void list_put(
 		} else {
 			lru->front->nextLRU->backLRU = lru->front;
 		}
+		lru->on_add_element(lru->forwardRef);
 	} else {
 		NodeLL temp = list->front;
 		while(temp && !comp(data, temp->data)) {
