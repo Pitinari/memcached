@@ -23,10 +23,29 @@ struct fdinfo {
 	struct sockaddr_in sin;
 };
 
+int get_length(int fd) {
+	int len;
+	char lbuf[4];
+
+	/* Recibir 4 bytes de la clave */
+	read(fd, lbuf, 4);
+
+	/* Castear esos bytes a un int */
+	int len_net = *(int*)lbuf;
+	/* Pero eran big-endian, así que llevar al endianness de la máquina */
+	len = ntohl(len_net);
+	return len;
+}
+
+void send_length(int fd, int len) {
+	int len_net = htonl(len);
+	write(fd, &len_net, 4);
+}
+
 // Handler de una conexion a cliente en modo binario
 bool binary_handler(int fd, Memcached table) {
 	int t;
-	int buf = 0;
+	char buf = 0;
 	t = read(fd, &buf, 1);
 
 	/* EOF */
@@ -49,21 +68,11 @@ bool binary_handler(int fd, Memcached table) {
 	}
 
 	if (buf == PUT) {
-		int keyLength;
-		t = read(fd, &keyLength, 4);
-		if (t <= 0) {
-			fprintf(stderr, "retornar error length\n");
-			return true;
-		}
+		int keyLength = get_length(fd);
 		void *key = custom_malloc(table->ht, keyLength);
 		t = read(fd, key, keyLength);
 
-		int valueLength;
-		t = read(fd, &valueLength, 4);
-		if (t <= 0) {
-			fprintf(stderr, "retornar error length\n");
-			return true;
-		}
+		int valueLength = get_length(fd);
 		void *value = custom_malloc(table->ht, valueLength);
 		t = read(fd, value, valueLength);
 
@@ -74,12 +83,7 @@ bool binary_handler(int fd, Memcached table) {
 		}
 	} 
 	else if (buf == DEL)  {
-		int keyLength;
-		t = read(fd, &keyLength, 4);
-		if (t <= 0) {
-			fprintf(stderr, "retornar error length\n");
-			return true;
-		}
+		int keyLength = get_length(fd);
 		void *key = custom_malloc(table->ht, keyLength);
 		t = read(fd, key, keyLength);
 
@@ -94,13 +98,8 @@ bool binary_handler(int fd, Memcached table) {
 		free(key);
 	} 
 	else if (buf == GET) {
-		int keyLength;
-		t = read(fd, &keyLength, 4);
-		if (t <= 0) {
-			fprintf(stderr, "retornar error length\n");
-			return true;
-		}
-		fprintf(stderr, "length: %d\n", keyLength);
+		int keyLength = get_length(fd);
+		// fprintf(stderr, "length: %d\n", keyLength);
 		void *key = custom_malloc(table->ht, keyLength);
 		t = read(fd, key, keyLength);
 
@@ -108,6 +107,7 @@ bool binary_handler(int fd, Memcached table) {
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
+			send_length(fd, sizeof(value));
 			write(fd, value, sizeof(value));
 		} 
 		else {
@@ -117,12 +117,7 @@ bool binary_handler(int fd, Memcached table) {
 		free(key);
 	} 
 	else if (buf == TAKE) {
-		int keyLength;
-		t = read(fd, &keyLength, 4);
-		if (t <= 0) {
-			fprintf(stderr, "retornar error length\n");
-			return true;
-		}
+		int keyLength = get_length(fd);
 		void *key = custom_malloc(table->ht, keyLength);
 		t = read(fd, key, keyLength);
 
@@ -130,6 +125,7 @@ bool binary_handler(int fd, Memcached table) {
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
+			send_length(fd, sizeof(value));
 			write(fd, value, sizeof(value));
 		} else {
 			int code = ENOTFOUND;
@@ -146,7 +142,6 @@ bool binary_handler(int fd, Memcached table) {
 		fprintf(stderr, "einval\n");
 		int code = EINVAL;
 		write(fd, &code, 1);
-		/*Limpiar buffer?*/
 	}
 	return true;
 }
@@ -263,7 +258,7 @@ bool text_handler(int fd, Memcached table) {
 				return true; // error
 			}
 			strcpy(value, comm[2]);
-			int i = memcached_put(table, key, strlen(key), value);
+			int i = memcached_put(table, key, strlen(key) + 1, value);
 			if (i == 0)
 				write(fd, "OK\n", 4);
 		} 
