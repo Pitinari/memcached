@@ -54,7 +54,7 @@ void list_put(
 	ComparativeFunction comp
 ){
 	if(list->front == NULL) {
-		list->front = nodell_create(data, lru->custom_malloc, list);
+		list->front = nodell_create(data, list, lru);
 		list->rear = list->front;
 		list->front->nextLRU = lru->front;
 		lru->front = list->front;
@@ -82,7 +82,7 @@ void list_put(
 			}
 		} else {
 			temp = list->rear;
-			list->rear = nodell_create(data, lru->custom_malloc, list);
+			list->rear = nodell_create(data, list, lru);
 			list->rear->backList = temp;
 			temp->nextList = list->rear;
 			list->rear->nextLRU = lru->front;

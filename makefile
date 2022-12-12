@@ -8,10 +8,13 @@ U = utils/
 start: compile
 	./server
 
+debug: compile
+	valgrind ./server
+
 compile: server.o memcached_controller.o memcached_service.o hash_table_with_lru.o hash.o list_with_lru.o
 	gcc $(FLAGS) server.o memcached_controller.o memcached_service.o hash_table_with_lru.o hash.o list_with_lru.o -o server
 
-server.o: server.c memcached_controller.h memcached_controller.o
+server.o: server.c memcached_controller.h memcached_service.h memcached_controller.o
 	gcc $(FLAGS) -c server.c
 
 memcached_controller.o: memcached_controller.c memcached_controller.h memcached_service.h memcached_service.o

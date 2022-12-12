@@ -33,7 +33,7 @@ enum code {
 int get_length(int fd);
 
 // Handler de una conexion a cliente en modo binario
-void binary_handler(int fd, Memcached table);
+bool binary_handler(int fd, Memcached table);
 
 // Handler de una conexion a cliente en modo texto
-void text_handler(int fd, Memcached table);
+bool text_handler(int fd, Memcached table);

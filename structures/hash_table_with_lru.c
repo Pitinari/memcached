@@ -16,7 +16,7 @@ void on_delete_element(void *hashTable){
 void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList){
   void *mem;
   int numberTries = 0;
-  while((mem = malloc(size)) == NULL && numberTries < 10) {
+  while((mem = malloc(size)) == NULL && numberTries < 3) {
     pthread_mutex_lock(((HashTable)hashTable)->lru_lock);
     lru_deallocate(((HashTable)hashTable)->lru, currentList);
     pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
@@ -58,21 +58,27 @@ HashTable create_hashtable(
   if(!table) goto error1;
 	table->lists = malloc(sizeof(struct _List) * size);
   if(!table->lists) goto error2;
-  int i = 0;
+  int i = 0, j = 0;
   while(i < size){
     table->lists[i] = list_create();
     if(!table->lists[i]) { i--; goto error3; }
     i++;
   }
-  table->lists_locks = malloc(sizeof(pthread_mutex_t) * size);
+  table->lists_locks = malloc(sizeof(pthread_mutex_t *) * size);
   if(!table->lists_locks) goto error4;
 
   table->lru_lock = malloc(sizeof(pthread_mutex_t));
   if(!table->lru_lock) goto error5;
 
-  for(int j = 0; j < size; j++) {
+  for(; j < size; j++) {
+    if((table->lists_locks[j] = malloc(sizeof(pthread_mutex_t))) == NULL){
+      j--;
+      goto error6;
+    }
     pthread_mutex_init(table->lists_locks[j], NULL);
   }
+
+  pthread_mutex_init(table->lru_lock, NULL);
 
 	table->lru = lru_create(
     custom_malloc_wrapper, 
@@ -83,15 +89,21 @@ HashTable create_hashtable(
     on_delete_element,
     (void *)table
   );
-  if(!table->lru) goto error6;
+  if(!table->lru) goto error7;
 
 	table->size = size;
 	table->numElems = ATOMIC_VAR_INIT(0);
 
 	return table;
 
-  error6:
+  error7:
   free(table->lru_lock);
+  j--;
+
+  error6:
+  for(; j >= 0; j--) {
+    free(table->lists_locks[i]);
+  }
 
   error5:
   free(table->lists_locks);
