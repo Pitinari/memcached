@@ -29,9 +29,6 @@ enum code {
 	EUNK = 115,
 };
 
-// Lee el tamaño del dato
-int get_length(int fd);
-
 // Handler de una conexion a cliente en modo binario
 bool binary_handler(int fd, Memcached table);
 
