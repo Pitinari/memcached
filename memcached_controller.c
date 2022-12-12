@@ -135,6 +135,9 @@ bool binary_handler(int fd, Memcached table) {
 	} 
 	else if (buf == STATS) {
 		char* line = memcached_stats(table);
+		char code = OK;
+		write(fd, &code, 1);
+		send_length(fd, strlen(line)+1);
 		write(fd, line, strlen(line)+1);
 		free(line);
 	} 
@@ -202,7 +205,8 @@ bool text_handler(int fd, Memcached table) {
 	// fprintf(stderr, "'%s' '%s' '%s'\n", comm[0], comm[1], comm[2]);
 	if (strcmp(comm[0], "STATS") == 0 && wordsCount == 1) {
 		char* stats = memcached_stats(table);
-		write(fd, stats, strlen(stats));
+		write(fd, "OK\n", 4);
+		write(fd, stats, strlen(stats)+1);
 	} else if(wordsCount > 1){
 		
 		if (strcmp(comm[0], "DEL") == 0 && wordsCount == 2) {
