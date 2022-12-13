@@ -13,14 +13,15 @@
 #include <stdlib.h>
 #include "memcached_service.h"
 
-enum code {
+enum commands {
 	PUT = 11,
 	DEL = 12,
 	GET = 13,
 	TAKE = 14,
-
 	STATS = 21,
+};
 
+enum responses {
 	OK = 101,
 	EINVALID = 111,
 	ENOTFOUND = 112,
@@ -29,8 +30,25 @@ enum code {
 	EUNK = 115,
 };
 
+struct bin_state {
+	uint8_t operation;
+	unsigned cursor;
+	unsigned sizeBuf[4];
+
+	unsigned keyLen;
+	void* key;
+
+	unsigned valueLen;
+	void* value;
+};
+
+struct text_state {
+	size_t cursor;
+	char buf[2048];
+};
+
 // Handler de una conexion a cliente en modo binario
-bool binary_handler(int fd, Memcached table);
+bool binary_handler(int fd, struct bin_state *bin, Memcached table);
 
 // Handler de una conexion a cliente en modo texto
-bool text_handler(int fd, Memcached table);
+bool text_handler(int fd, struct text_state *text, Memcached table);

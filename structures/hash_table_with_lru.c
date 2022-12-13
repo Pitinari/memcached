@@ -178,9 +178,9 @@ void hashtable_destroy(HashTable table) {
  * buscado no se encuentra en la tabla.
  */
 void *hashtable_search(HashTable table, void *key, unsigned keyLen) {
-  unsigned hashedValue = hash_function(key, keyLen);
-  unsigned idx = hashedValue % table->size;
-  struct _NodeHT data = { key, keyLen, NULL, hashedValue };
+  unsigned hashedKey = hash_function(key, keyLen);
+  unsigned idx = hashedKey % table->size;
+  struct _NodeHT data = { key, keyLen, NULL, hashedKey };
   pthread_mutex_lock(table->lists_locks[idx]);
 	NodeHT returnValue = (NodeHT)list_get(table->lists[idx], (void *)&data, comparate_keys);
   pthread_mutex_unlock(table->lists_locks[idx]);
@@ -192,10 +192,10 @@ void *hashtable_search(HashTable table, void *key, unsigned keyLen) {
  * Inserta un dato en la tabla, o lo reemplaza si ya se encontraba.
  */
 void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value) {
-  unsigned hashedValue = hash_function(key, keyLen);
-  unsigned idx = hashedValue % table->size;
-  NodeHT data = nodeht_create(table, key, keyLen, value, hashedValue);
-  pthread_mutex_lock(table->lists_locks[idx]);
+  unsigned hashedKey = hash_function(key, keyLen);
+  unsigned idx = hashedKey % table->size;
+  NodeHT data = nodeht_create(table, key, keyLen, value, hashedKey);
+ pthread_mutex_lock(table->lists_locks[idx]);
 	list_put(table->lists[idx], table->lru, (void *)data, comparate_keys);
   pthread_mutex_unlock(table->lists_locks[idx]);
 }

@@ -43,7 +43,7 @@ void send_length(int fd, int len) {
 }
 
 // Handler de una conexion a cliente en modo binario
-bool binary_handler(int fd, Memcached table) {
+bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	int t;
 	char buf = 0;
 	t = read(fd, &buf, 1);
@@ -149,8 +149,8 @@ bool binary_handler(int fd, Memcached table) {
 	return true;
 }
 
-int get_input_commands(char *input, char **commads){
-	char *lastReference = input;
+int get_input_commands(struct text_state *text, char **commads){
+	char *lastReference = text->buf, *input = text->buf;
 	int wordsCount = 1;
 	while(*input != '\n'){
 		if(*input == ' '){
@@ -158,8 +158,8 @@ int get_input_commands(char *input, char **commads){
 			*commads = lastReference;
 			commads++;
 			input++;
-			wordsCount++;
 			lastReference = input;
+			wordsCount++;
 		} else input++;
 	}
 	*input = '\0';
@@ -167,13 +167,24 @@ int get_input_commands(char *input, char **commads){
 	return wordsCount;
 }
 
-// Handler de una conexion a cliente en modo texto
-bool text_handler(int fd, Memcached table) {
-	int t;
-	char input[2048];
+void reset_input_buffer(struct text_state *text, char **commads, int wordCount){
+	int commandsLen = 0;
+	int i = 0;
+	while(i < wordCount)
+		commandsLen += (strlen(commads[i++]) + 1);
 
-	// inet_ntop(AF_INET, &fdinfo->sin.sin_addr, buf1, sizeof fdinfo->sin);
-	t = read(fd, input, 1);
+	i = 0;
+	while(i <= (text->cursor - commandsLen)){
+		text->buf[i] = text->buf[commandsLen + i];
+		i++;
+	}
+	text->cursor -= commandsLen;
+}
+
+// Handler de una conexion a cliente en modo texto
+bool text_handler(int fd, struct text_state *text, Memcached table) {
+
+	int t = read(fd, text->buf+text->cursor, 2048 - text->cursor);
 
 	/* EOF */
 	if (t == 0){
@@ -195,14 +206,16 @@ bool text_handler(int fd, Memcached table) {
 		return false;
 	}
 
-	t = read(fd, input+1, 2047);
+	text->cursor += t;
 
-	if (input[t] != '\n')
-		return false; /// mal formato
+	if(text->cursor == 2048 && text->buf[2047] != '\n'){
+		write(fd, "EINVAL\n", 8);
+		text->cursor = 0;
+		return true;
+	}
 
 	char *comm[3];
-	int wordsCount = get_input_commands(input, comm);
-	// fprintf(stderr, "'%s' '%s' '%s'\n", comm[0], comm[1], comm[2]);
+	int wordsCount = get_input_commands(text, comm);
 	if (strcmp(comm[0], "STATS") == 0 && wordsCount == 1) {
 		char* stats = memcached_stats(table);
 		write(fd, "OK\n", 4);
@@ -219,9 +232,7 @@ bool text_handler(int fd, Memcached table) {
 			}
 		} 
 		else if (strcmp(comm[0], "GET") == 0 && wordsCount == 2) {
-
 			char *value = memcached_get(table, comm[1], strlen(comm[1]));
-			// fprintf(stderr, "'%s'\n", value);
 			if (value) {
 				if (1/*representable*/) {
 					write(fd, "OK\n", 4);
@@ -253,7 +264,9 @@ bool text_handler(int fd, Memcached table) {
 		} 
 		else if (strcmp(comm[0], "PUT") == 0 && wordsCount == 3) {
 			char *key = custom_malloc(table->ht, strlen(comm[1]) + 1);
-			if(key == NULL) return true; // error
+			if(key == NULL){
+				return true; // error
+			}
 			strcpy(key, comm[1]);
 
 			char *value = custom_malloc(table->ht, strlen(comm[2]) + 1);
@@ -262,7 +275,7 @@ bool text_handler(int fd, Memcached table) {
 				return true; // error
 			}
 			strcpy(value, comm[2]);
-			int i = memcached_put(table, key, strlen(key) + 1, value);
+			int i = memcached_put(table, key, strlen(key), value);
 			if (i == 0)
 				write(fd, "OK\n", 4);
 		} 
@@ -270,5 +283,6 @@ bool text_handler(int fd, Memcached table) {
 			write(fd, "EINVAL\n", 8);
 		}
 	}
+	reset_input_buffer(text, comm, wordsCount);
 	return true;
 }

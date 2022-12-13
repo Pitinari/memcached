@@ -16,6 +16,7 @@
 #include "memcached_service.h"
 #include <pthread.h>
 #include <sys/resource.h>
+#include <fcntl.h>
 
 #define DATA_LIMIT 1000000000
 #define NUM_OF_NODES 10000
@@ -35,19 +36,41 @@ typedef struct _args *args;
 struct _dataEvent {
 	bool bin;
 	int fd;
+	union input_state {
+		struct text_state *text;
+		struct bin_state *bin;
+	} input_state;
 };
 
 typedef struct _dataEvent *dataEvent;
 
 int register_fd(int epfd, int fd, bool bin, Memcached mc) {
+	
+	int flags = fcntl(fd, F_GETFL);
+	if (flags == -1) return -1;
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) return -1;
+
 	struct epoll_event ev;
 	dataEvent data = custom_malloc(mc->ht, sizeof(struct _dataEvent));
 	if(data == NULL) return -1;
 	data->bin = bin;
 	data->fd = fd;
+	if(bin) {
+		data->input_state.bin = custom_malloc(mc->ht, sizeof(struct bin_state));
+		if(data->input_state.bin == NULL) goto error;
+		data->input_state.bin->cursor = 0;
+	} else {
+		data->input_state.text = custom_malloc(mc->ht, sizeof(struct text_state));
+		if(data->input_state.text == NULL) goto error;
+		data->input_state.text->cursor = 0;
+	}
 	ev.events = EPOLLIN | EPOLLONESHOT;
 	ev.data.ptr = (void *)data;
 	return epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+
+	error:
+	free(data);
+	return -1;
 }
 
 int modify_fd(int epfd, int fd, dataEvent ptr, Memcached mc) {
@@ -70,6 +93,57 @@ static void die(char *s, ...)
 	fflush(stderr);
 	abort();
 }
+
+void *loop(void* arg) {
+	int nev, fd, newSock;
+	struct epoll_event ev[16];
+	struct _args loopArgs = *(args)arg;
+
+again:
+	nev = epoll_wait(loopArgs.epfd, ev, 16, -1);
+	if (nev < 0) {
+		if (errno == EINTR) {
+			fprintf(stderr, "eintr!!\n");
+			goto again;
+		} else {
+			die("epoll_wait");
+		}
+	}
+
+	bool state;
+	for (int i = 0; i < nev; i++) {
+		dataEvent data = (dataEvent)ev[i].data.ptr;
+		fd = data->fd;
+		if (fd == loopArgs.textSock || fd == loopArgs.binSock) {
+			
+			newSock = accept(fd, NULL, NULL);
+			if(newSock < 0)
+				continue;
+
+			fprintf(stderr, "Nuevo Cliente\n");
+			if(register_fd(loopArgs.epfd, newSock, data->bin, loopArgs.mc) < 0)
+				close(newSock);
+			if(modify_fd(loopArgs.epfd, fd, data, loopArgs.mc) < 0)
+				die("No se puedo volver a guardar el listener");
+		} else {
+			if(((dataEvent)ev[i].data.ptr)->bin) {
+				state = binary_handler(fd, data->input_state.bin, loopArgs.mc);
+			} else {
+				state = text_handler(fd, data->input_state.text, loopArgs.mc);
+			}
+			if(state){
+				modify_fd(loopArgs.epfd, fd, data, loopArgs.mc);
+			} else {
+				if(data->bin) free(data->input_state.bin);
+				else free(data->input_state.text);
+				free(data);
+			}
+		}
+	}
+
+	goto again;
+}
+
 
 int create_sock(int port) {
 	struct sockaddr_in sa;
@@ -98,52 +172,6 @@ int create_sock(int port) {
 	if (rc < 0) die("listen");
 
 	return lsock;
-}
-
-void *loop(void* arg) {
-	int nev, fd, newSock;
-	struct epoll_event ev[16];
-	struct _args loopArgs = *(args)arg;
-
-again:
-	nev = epoll_wait(loopArgs.epfd, ev, 16, -1);
-	if (nev < 0) {
-		if (errno == EINTR) {
-			fprintf(stderr, "eintr!!\n");
-			goto again;
-		} else {
-			die("epoll_wait");
-		}
-	}
-
-	// fprintf(stderr, "nev = %i\n", nev);
-
-	bool connection;
-	for (int i = 0; i < nev; i++) {
-		fd = ((dataEvent)ev[i].data.ptr)->fd;
-		// fprintf(stderr, "socket registered. fd %i %i %i\n", loopArgs.textSock, loopArgs.binSock, fd);
-		if (fd == loopArgs.textSock || fd == loopArgs.binSock) {
-			
-			newSock = accept(fd, NULL, NULL);
-			if(newSock < 0){
-				// fprintf(stderr, "Error on create the socket. FD = %i\n", newSock);
-				continue;
-			}
-			register_fd(loopArgs.epfd, newSock, ((dataEvent)ev[i].data.ptr)->bin, loopArgs.mc);
-			modify_fd(loopArgs.epfd, fd, (dataEvent)ev[i].data.ptr, loopArgs.mc);
-		} else {
-			if(((dataEvent)ev[i].data.ptr)->bin) {
-				connection = binary_handler(fd, loopArgs.mc);
-			} else {
-				connection = text_handler(fd, loopArgs.mc);
-			}
-			if(connection){
-				modify_fd(loopArgs.epfd, fd, (dataEvent)ev[i].data.ptr, loopArgs.mc);
-			}
-		}
-	}
-
-	goto again;
 }
 
 int main() {
