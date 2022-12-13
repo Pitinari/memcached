@@ -82,10 +82,15 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	if (buf == PUT) {
 		int keyLength = get_length(fd);
 		void *key = custom_malloc(table->ht, keyLength);
+		if (key == NULL) return true;
 		t = read(fd, key, keyLength);
 
 		int valueLength = get_length(fd);
 		void *value = custom_malloc(table->ht, valueLength);
+		if (value == NULL) {
+			free(key);
+			return true;
+		}
 		t = read(fd, value, valueLength);
 
 		int i = memcached_put(table, key, keyLength, value);
@@ -97,6 +102,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	else if (buf == DEL)  {
 		int keyLength = get_length(fd);
 		void *key = custom_malloc(table->ht, keyLength);
+		if (key == NULL) return true;
 		t = read(fd, key, keyLength);
 
 		int i = memcached_delete(table, key, keyLength);
@@ -113,6 +119,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		int keyLength = get_length(fd);
 		// fprintf(stderr, "length: %d\n", keyLength);
 		void *key = custom_malloc(table->ht, keyLength);
+		if (key == NULL) return true;
 		t = read(fd, key, keyLength);
 
 		void *value = memcached_get(table, key, keyLength);
@@ -131,6 +138,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	else if (buf == TAKE) {
 		int keyLength = get_length(fd);
 		void *key = custom_malloc(table->ht, keyLength);
+		if (key == NULL) return true;
 		t = read(fd, key, keyLength);
 
 		void *value = memcached_take(table, key, keyLength);
@@ -144,6 +152,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 			write(fd, &code, 1);
 		}
 		free(key);
+		free(value);
 	} 
 	else if (buf == STATS) {
 		char* line = memcached_stats(table);
