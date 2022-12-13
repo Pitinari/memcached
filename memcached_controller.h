@@ -30,10 +30,19 @@ enum responses {
 	EUNK = 115,
 };
 
+enum bin_state_current_reading {
+	OPERATOR,
+	KEY_SIZE,
+	KEY,
+	VALUE_SIZE,
+	VALUE
+};
+
 struct bin_state {
-	uint8_t operation;
+	enum bin_state_current_reading reading;
+	uint8_t operator;
 	unsigned cursor;
-	unsigned sizeBuf[4];
+	uint8_t sizeBuf[4];
 
 	unsigned keyLen;
 	void* key;

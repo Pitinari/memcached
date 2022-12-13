@@ -45,6 +45,18 @@ void send_length(int fd, int len) {
 // Handler de una conexion a cliente en modo binario
 bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	int t;
+	switch (bin->reading)
+	{
+	case OPERATOR:
+		t = read(fd, &bin->operator, 1);
+		if(t <= 0) goto error_input;
+		break;
+	
+	default:
+		break;
+	}
+	
+	int t;
 	char buf = 0;
 	t = read(fd, &buf, 1);
 
