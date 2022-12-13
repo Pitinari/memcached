@@ -5,27 +5,28 @@
 #include "hash_table_with_lru.h"
 #include "../utils/hash.h"
 
-void on_add_element(void *hashTable){
+void on_add_element(void *hashTable) {
   atomic_fetch_add(&((HashTable)hashTable)->numElems, 1);
 }
 
-void on_delete_element(void *hashTable){
+void on_delete_element(void *hashTable) {
   atomic_fetch_sub(&((HashTable)hashTable)->numElems, 1);
 }
 
-void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList){
+void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList) {
   void *mem;
   int numberTries = 0;
-  while((mem = malloc(size)) == NULL && numberTries < 3) {
+  bool removed = true;
+  while((mem = malloc(size)) == NULL && numberTries < 3 && removed) {
     pthread_mutex_lock(((HashTable)hashTable)->lru_lock);
-    lru_deallocate(((HashTable)hashTable)->lru, currentList);
+    removed = lru_deallocate(((HashTable)hashTable)->lru, currentList);
     pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
     numberTries++;
   }
   return mem;
 }
 
-List lru_preprocessing(void *hashTable, void *data, List currentList){
+List lru_preprocessing(void *hashTable, void *data, List currentList) {
   int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
   List list = ((HashTable)hashTable)->lists[idx];
   if(list != currentList) {
@@ -34,7 +35,7 @@ List lru_preprocessing(void *hashTable, void *data, List currentList){
   return list;
 }
 
-void lru_postprocessing(void *hashTable, void *data, List currentList){
+void lru_postprocessing(void *hashTable, void *data, List currentList) {
   int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
   List list = ((HashTable)hashTable)->lists[idx];
   if(list != currentList) {
@@ -42,17 +43,11 @@ void lru_postprocessing(void *hashTable, void *data, List currentList){
   }
 }
 
-void nodeht_destroy_wrapper(void *node){
+void nodeht_destroy_wrapper(void *node) {
   nodeht_destroy((NodeHT)node);
 }
 
-/**
- * Crea una nueva tabla hash vacia, con la capacidad dada.
- */
-HashTable create_hashtable(
-  unsigned size
-) {
-
+HashTable create_hashtable(unsigned size) {
 	// Pedimos memoria para la estructura principal y las casillas.
 	HashTable table = malloc(sizeof(struct _HashTable));
   if(!table) goto error1;
@@ -121,7 +116,8 @@ HashTable create_hashtable(
   return NULL;
 }
 
-bool comparate_keys(void *data1, void *data2){
+/* Funcion para comparar las claves */
+bool comparate_keys(void *data1, void *data2) {
   NodeHT a = (NodeHT)data1, b = (NodeHT)data2;
   if(
     a->keyLen == b->keyLen &&
@@ -147,9 +143,7 @@ NodeHT nodeht_create(
   return node;
 }
 
-void nodeht_destroy(
-  NodeHT node
-){
+void nodeht_destroy(NodeHT node) {
   free(node->key);
   free(node->value);
   free(node);
