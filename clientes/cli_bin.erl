@@ -13,79 +13,86 @@
 -define(EBIG, 114).
 -define(EUNK, 115).
 
-sized(A) -> 
-  B = integer_to_binary(size(A)),
-  case size(B) of
-    1 -> {ok, <<0, 0, 0, B/binary>>};
-    2 -> {ok, <<0, 0, B/binary>>};
-    3 -> {ok, <<0, B/binary>>};
-    4 -> {ok, B};
-    _ -> {error, "error en sized, binario demasiado grande"} % devolver causa del error sin perder el programa
-  end.
+decode(Code) ->
+    case Code of
+        ?OK -> ok;
+        ?EINVAL -> einval;
+        ?ENOTFOUND -> enotfound;
+        ?EBIG -> ebig;
+        ?EUNK -> eunk;
+        Code -> Code
+    end.
 
-code(K) ->
-  B = term_to_binary(K),
-  case sized(B) of
-    {ok, Coded} -> << Coded/binary, B/binary >>;
-    {error, Reason} -> {error, Reason}
-  end.
+
+code(Data) ->
+  Bin = term_to_binary(Data),
+  Size = byte_size(Bin),
+  BSize = <<Size:32>>,
+  <<BSize/binary, Bin/binary>>.
 
 put(Sock, K, V) ->
-  ok = gen_tcp:send(Sock, <<?PUT, (code(K))/binary, (code(V))/binary >> ), % PUT = 11 % hacer una llamada a sized y ver que sea correcto
-  case gen_tcp:recv(Sock, 1) of
-    ?OK -> ok;
-    Cod -> io:fwrite("error en pedido, devolvió ~p ~n", [Cod])
+  case gen_tcp:send(Sock, <<?PUT, (code(K))/binary, (code(V))/binary >> ) of
+    ok -> case gen_tcp:recv(Sock, 1) of
+            {ok, <<Code>>} -> decode(Code);
+            {error, Reason} -> io:fwrite("error en recv, devolvió ~p ~n", [Reason])
+          end;
+    {error, Reason} -> io:fwrite("error en send, devolvió ~p ~n", [Reason])
   end.
 
 del(Sock, K) ->
-  ok = gen_tcp:send(Sock, <<?DEL, (code(K))/binary>> ),
-  case gen_tcp:recv(Sock, 1) of
-    ?OK -> ok;
-    ?ENOTFOUND -> enotfound;
-    Cod -> io:fwrite("error en pedido, devolvió ~p ~n", [Cod])
+  case gen_tcp:send(Sock, <<?DEL, (code(K))/binary >> ) of
+    ok -> case gen_tcp:recv(Sock, 1) of
+            {ok, <<Code>>} -> decode(Code);
+            {error, Reason} -> io:fwrite("error en recv, devolvió ~p ~n", [Reason])
+          end;
+    {error, Reason} -> io:fwrite("error en send, devolvió ~p ~n", [Reason])
   end.
 
 get(Sock, K) ->
-  ok = gen_tcp:send(Sock, <<?GET, (code(K))/binary>> ),  
-  case gen_tcp:recv(Sock, 1) of
-    ?OK -> case gen_tcp:recv(Sock, 4) of
-             {ok, Size} -> case gen_tcp:recv(Sock, binary_to_integer(Size)) of
-                             {ok, Packet} -> {ok, Packet};
-                             {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
-                           end;
-             {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
-           end;
-    ?ENOTFOUND -> enotfound;
-    Cod -> io:fwrite("error en pedido, devolvió ~p ~n", [Cod])
+  case gen_tcp:send(Sock, <<?GET, (code(K))/binary>> ) of
+    ok -> case gen_tcp:recv(Sock, 1) of
+            {ok, <<?OK>>} -> case gen_tcp:recv(Sock, 4) of
+                              {ok, Size} -> case gen_tcp:recv(Sock, binary:decode_unsigned(Size)) of
+                                                  {ok, Packet} -> {ok, binary_to_term(Packet)};
+                                                  {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
+                                                end;
+                              {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
+                            end;
+            {ok, <<?ENOTFOUND>>} -> enotfound;
+            {error, Reason} -> io:fwrite("error en recv, devolvió ~p ~n", [Reason])
+          end;
+    {error, Reason} -> io:fwrite("error en send, devolvió ~p ~n", [Reason])
   end.
 
 take(Sock, K) ->
-  ok = gen_tcp:send(Sock, <<?TAKE, (code(K))/binary>> ),
-  case gen_tcp:recv(Sock, 1) of
-    ?OK -> case gen_tcp:recv(Sock, 4) of
-             {ok, Size} -> case gen_tcp:recv(Sock, binary_to_integer(Size)) of
-                             {ok, Packet} -> {ok, Packet};
-                             {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
-                           end;
-             {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
-           end;
-    ?ENOTFOUND -> enotfound;
-    Cod -> io:fwrite("error en pedido, devolvió ~p~n", [Cod])
-  end,
-  ok.
+  case gen_tcp:send(Sock, <<?TAKE, (code(K))/binary>> ) of
+    ok -> case gen_tcp:recv(Sock, 1) of
+            {ok, <<?OK>>} -> case gen_tcp:recv(Sock, 4) of
+                              {ok, Size} -> case gen_tcp:recv(Sock, binary:decode_unsigned(Size)) of
+                                              {ok, Packet} -> {ok, binary_to_term(Packet)};
+                                              {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
+                                            end;
+                              {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
+                            end;
+            {ok, <<?ENOTFOUND>>} -> enotfound;
+            Cod -> io:fwrite("error en pedido, devolvió ~p~n", [Cod])
+          end;
+    {error, Reason} -> io:fwrite("error en send, devolvió ~p~n", [Reason])
+  end.
 
 stats(Sock) ->
-  ok = gen_tcp:send(Sock, ?STATS),
-  case gen_tcp:recv(Sock, 1) of
-    ?OK -> case gen_tcp:recv(Sock, 0) of
-             {ok, Packet} -> io:fwrite("~p~n", [Packet]);
-             {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
-           end;
-    Cod -> io:fwrite("error en pedido, devolvió ~p ~n", [Cod])
-  end,
-  ok.
+  case gen_tcp:send(Sock, ?STATS) of
+    ok -> case gen_tcp:recv(Sock, 1) of
+            ?OK -> case gen_tcp:recv(Sock, 0) of
+                    {ok, Packet} -> {ok, binary_to_list(Packet)};
+                    {error, Reason} -> io:fwrite("error en recv: ~p~n", [Reason])
+                  end;
+            Cod -> io:fwrite("error en pedido, devolvió ~p ~n", [Cod])
+          end;
+    {error, Reason} -> io:fwrite("error en send, devolvió ~p~n", [Reason])
+  end.
 
 start() ->
-  gen_tcp:connect("localhost", 889, [binary, {packet, raw}]).
+  gen_tcp:connect("localhost", 889, [binary, {active, false}, {packet, raw}]).
 
 close(Sock) -> gen_tcp:close(Sock).
