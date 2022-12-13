@@ -19,6 +19,7 @@ enum commands {
 	GET = 13,
 	TAKE = 14,
 	STATS = 21,
+	EMPTY = 0,
 };
 
 enum responses {
@@ -40,7 +41,7 @@ enum bin_state_current_reading {
 
 struct bin_state {
 	enum bin_state_current_reading reading;
-	uint8_t operator;
+	uint8_t command;
 	unsigned cursor;
 	uint8_t sizeBuf[4];
 

@@ -14,15 +14,6 @@
 #include "memcached_service.h"
 #include "memcached_controller.h"
 
-struct fdinfo {
-	enum {
-		LSOCK,
-		CLIENT
-	} type;
-	int fd;
-	struct sockaddr_in sin;
-};
-
 int get_length(int fd) {
 	int len;
 	char lbuf[4];
@@ -42,16 +33,42 @@ void send_length(int fd, int len) {
 	write(fd, &len_net, 4);
 }
 
+bool validate_operation(int op){
+	return op == PUT || op == DEL || op == GET || op == TAKE || op == STATS;
+}
+
 // Handler de una conexion a cliente en modo binario
 bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	int t;
+	again:
 	switch (bin->reading)
 	{
 	case OPERATOR:
-		t = read(fd, &bin->operator, 1);
+		t = read(fd, &bin->command, 1);
 		if(t <= 0) goto error_input;
+		if(!validate_operation(bin->command)){
+			fprintf(stderr, "einval\n");
+			int code = EINVAL;
+			write(fd, &code, 1);
+		}
+		bin->cursor = t;
+		bin->reading = KEY_SIZE;
+		goto again;
 		break;
-	
+	case KEY_SIZE:
+		char buf[4];
+		t = read(fd, &buf, 5 - bin->cursor);
+		if(t <= 0) goto error_input;
+		for(int i = 0; i < t; i++){
+			bin->sizeBuf[bin->cursor] = buf[i];
+			bin->cursor++;
+		}
+		if(bin->cursor == 5){
+			bin->reading = KEY;
+			for(int i = 0; i < 4; i++){
+				bin->keyLen = bin->sizeBuf[i]
+			}
+		}
 	default:
 		break;
 	}

@@ -60,6 +60,9 @@ int register_fd(int epfd, int fd, bool bin, Memcached mc) {
 		if(data->input_state.bin == NULL) goto error;
 		data->input_state.bin->cursor = 0;
 		data->input_state.bin->reading = OPERATOR;
+		data->input_state.bin->command = EMPTY;
+		data->input_state.bin->keyLen = 0;
+		data->input_state.bin->valueLen = 0;
 	} else {
 		data->input_state.text = custom_malloc(mc->ht, sizeof(struct text_state));
 		if(data->input_state.text == NULL) goto error;
