@@ -14,10 +14,6 @@ void on_delete_element(void *hashTable) {
 	atomic_fetch_sub(&((HashTable)hashTable)->numElems, 1);
 }
 
-void *custom_malloc(HashTable hashTable, size_t size) {
-	return custom_malloc_wrapper((void *)hashTable, size, NULL);
-}
-
 void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList) {
 	void *mem;
 	int numberTries = 0;
@@ -29,6 +25,10 @@ void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList) {
 		numberTries++;
 	}
 	return mem;
+}
+
+void *custom_malloc(HashTable hashTable, size_t size) {
+	return custom_malloc_wrapper((void *)hashTable, size, NULL);
 }
 
 List lru_preprocessing(void *hashTable, void *data, List currentList) {
@@ -45,6 +45,18 @@ void lru_postprocessing(void *hashTable, void *data, List currentList) {
 	List list = ((HashTable)hashTable)->lists[idx];
 	if(list != currentList) {
 		pthread_mutex_unlock(((HashTable)hashTable)->lists_locks[idx]);
+	}
+}
+
+void nodeht_destroy_wrapper(void *node) {
+	nodeht_destroy((NodeHT)node);
+}
+
+void nodeht_destroy(NodeHT node) {
+	if (node != NULL) {	
+		free(node->key);
+		free(node->value);
+		free(node);
 	}
 }
 
@@ -135,18 +147,6 @@ NodeHT nodeht_create(HashTable hashTable, void *key, unsigned keyLen,
 		node->hashedKey = hashedKey;
 	}	
 	return node;
-}
-
-void nodeht_destroy_wrapper(void *node) {
-	nodeht_destroy((NodeHT)node);
-}
-
-void nodeht_destroy(NodeHT node) {
-	if (node != NULL) {	
-		free(node->key);
-		free(node->value);
-		free(node);
-	}
 }
 
 void hashtable_destroy(HashTable table) {

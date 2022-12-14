@@ -45,7 +45,7 @@ LRU lru_create(AllocationFunction custom_malloc, DestructiveFunction dest,
 
 void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 	/* Caso lista vacia */
-	if (list == NULL || lru == NULL) return NULL;
+	if (list == NULL || lru == NULL) return;
 	if (list->front == NULL) {
 		list->front = nodell_create(data, list, lru);
 		if (list->front == NULL) return; /* No se pudo allocar */
