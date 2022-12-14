@@ -53,6 +53,10 @@ void *hashtable_take(HashTable table, void *key, unsigned keyLen);
 /* Funcion personal para allocar memoria */
 void *custom_malloc(HashTable hashTable, size_t size);
 
+/* Funcion para crear nodos de la hash table */
+NodeHT nodeht_create(HashTable hashTable, void *key, unsigned keyLen,
+											void *value, unsigned hashedKey);
+
 /* Libera la memoria del nodo */
 void nodeht_destroy(NodeHT node);
 
