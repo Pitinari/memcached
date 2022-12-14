@@ -319,7 +319,13 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 			if (value) {
 				if (1/*representable*/) {
 					write(fd, "OK\n", 4);
-					write(fd, value, strlen(value)+1);
+					int len = strlen(value)+1;
+					if (len > 2048) {
+						write(fd, "EBIG\n", 4);
+					}
+					else {
+						write(fd, value, len);
+					}
 				}
 				else {
 					write(fd, "EBINARY\n", 9);
