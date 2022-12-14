@@ -45,6 +45,7 @@ LRU lru_create(AllocationFunction custom_malloc, DestructiveFunction dest,
 
 void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 	/* Caso lista vacia */
+	if (list == NULL || lru == NULL) return NULL;
 	if (list->front == NULL) {
 		list->front = nodell_create(data, list, lru);
 		if (list->front == NULL) return; /* No se pudo allocar */
@@ -96,6 +97,7 @@ void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 }
 
 void* list_take(List list, LRU lru, void *data, ComparativeFunction comp) {
+	if (list == NULL || lru == NULL) return NULL;
 	if (list->front != NULL) {
 		/* Buscamos el nodo deseado*/
 		NodeLL temp = list->front;
@@ -155,6 +157,7 @@ void* list_get(List list, void *data, ComparativeFunction comp) {
 }
 
 bool lru_deallocate(LRU lru, List currentList) {
+	if (lru == NULL) return false;
 	if (lru->rear != NULL) {
 		int alreadyDeallocated = 0;
 		NodeLL temp = lru->rear;
@@ -196,6 +199,7 @@ void list_destroy(List list) {
 }
 
 void lru_destroy(LRU lru) {
+	if (lru == NULL) return;
 	NodeLL current = lru->front;
 	while (lru->front) {
 		lru->dest(current->data);
