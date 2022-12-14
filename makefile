@@ -6,10 +6,10 @@ S = structures/
 U = utils/
 
 start: compile
-	./server
+	sudo ./server
 
 debug: compile
-	valgrind ./server
+	sudo valgrind ./server
 
 compile: server.o memcached_controller.o memcached_service.o hash_table_with_lru.o hash.o list_with_lru.o
 	gcc $(FLAGS) server.o memcached_controller.o memcached_service.o hash_table_with_lru.o hash.o list_with_lru.o -o server

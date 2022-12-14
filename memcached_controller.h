@@ -32,11 +32,12 @@ enum responses {
 };
 
 enum bin_state_current_reading {
-	OPERATOR,
-	KEY_SIZE,
-	KEY,
-	VALUE_SIZE,
-	VALUE
+	OPERATOR = 0,
+	KEY_SIZE = 1,
+	KEY = 2,
+	VALUE_SIZE = 3,
+	VALUE = 4,
+	COMPLETED = 5
 };
 
 struct bin_state {

@@ -18,7 +18,7 @@
 #include <sys/resource.h>
 #include <fcntl.h>
 
-#define DATA_LIMIT 1000000000
+#define DATA_LIMIT 2000000
 #define NUM_OF_NODES 10000
 #define N_THREADS 10
 
@@ -107,7 +107,7 @@ again:
 	nev = epoll_wait(loopArgs.epfd, ev, 16, -1);
 	if (nev < 0) {
 		if (errno == EINTR) {
-			fprintf(stderr, "eintr!!\n");
+			fprintf(stderr, "EINTR\n");
 			goto again;
 		} else {
 			die("epoll_wait");
@@ -124,11 +124,10 @@ again:
 			if(newSock < 0)
 				continue;
 
-			fprintf(stderr, "Nuevo Cliente\n");
 			if(register_fd(loopArgs.epfd, newSock, data->bin, loopArgs.mc) < 0)
 				close(newSock);
 			if(modify_fd(loopArgs.epfd, fd, data, loopArgs.mc) < 0)
-				die("No se puedo volver a guardar el listener");
+				die("Listener could not be saved properly");
 		} else {
 			if(((dataEvent)ev[i].data.ptr)->bin) {
 				state = binary_handler(fd, data->input_state.bin, loopArgs.mc);
@@ -180,8 +179,11 @@ int create_sock(int port) {
 
 int main() {
 
-	struct rlimit r = {.rlim_cur = DATA_LIMIT, .rlim_max = RLIM_INFINITY};
-	if (setrlimit(RLIMIT_DATA, &r) < 0) {
+	struct rlimit *r = malloc(sizeof(struct rlimit));
+	if(r == NULL) die("Error allocation limit memory structure");
+	r->rlim_cur = DATA_LIMIT;
+	r->rlim_max = RLIM_INFINITY;
+	if (setrlimit(RLIMIT_DATA, r) < 0) {
 		die("error limiting data");
 	}
 
@@ -210,6 +212,8 @@ int main() {
 	
 	if(register_fd(epfd, sock2, true, mc) < 0) 
 		die("error on register bin socket");
+
+	// setuid()
 
 	pthread_t hand[N_THREADS];
 	struct _args args;

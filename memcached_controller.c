@@ -37,92 +37,117 @@ bool validate_operation(int op){
 	return op == PUT || op == DEL || op == GET || op == TAKE || op == STATS;
 }
 
-// Handler de una conexion a cliente en modo binario
-bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
+int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 	int t;
-	again:
 	switch (bin->reading)
 	{
 	case OPERATOR:
 		t = read(fd, &bin->command, 1);
 		if(t <= 0) goto error_input;
 		if(!validate_operation(bin->command)){
-			fprintf(stderr, "einval\n");
+			fprintf(stderr, "EINVAL BINARY\n");
 			int code = EINVAL;
 			write(fd, &code, 1);
+			return 0;
 		}
-		bin->cursor = t;
 		bin->reading = KEY_SIZE;
-		goto again;
 		break;
 	case KEY_SIZE:
-		char buf[4];
-		t = read(fd, &buf, 5 - bin->cursor);
+
+		t = read(fd, bin->sizeBuf + bin->cursor, 4 - bin->cursor);
 		if(t <= 0) goto error_input;
-		for(int i = 0; i < t; i++){
-			bin->sizeBuf[bin->cursor] = buf[i];
-			bin->cursor++;
-		}
-		if(bin->cursor == 5){
+		bin->cursor += t;
+		if(bin->cursor == 4){
+			bin->keyLen = ntohl(*(unsigned *)bin->sizeBuf);
+			bin->key = custom_malloc(table->ht, bin->keyLen);
+			if(bin->key == NULL) return -1;
 			bin->reading = KEY;
-			for(int i = 0; i < 4; i++){
-				bin->keyLen = bin->sizeBuf[i]
-			}
+			bin->cursor = 0;
 		}
-	default:
+		break;
+	case KEY:
+		t = read(fd, bin->key + bin->cursor, bin->keyLen - bin->cursor);
+		if(t <= 0) goto error_input;
+		bin->cursor += t;
+		if(bin->cursor == bin->keyLen){
+			bin->reading = VALUE_SIZE;
+			bin->cursor = 0;
+		}
+		break;
+	case VALUE_SIZE:
+		t = read(fd, bin->sizeBuf + bin->cursor, 4 - bin->cursor);
+		if(t <= 0) goto error_input;
+		bin->cursor += t;
+		if(bin->cursor == 4){
+			bin->reading = VALUE;
+			bin->valueLen = ntohl(*(unsigned *)bin->sizeBuf);
+			bin->value = custom_malloc(table->ht, bin->valueLen);
+			if(bin->value == NULL){
+				free(bin->key);
+				return -1;
+			}
+			bin->cursor = 0;
+		}
+		break;
+	case VALUE:
+		t = read(fd, bin->value + bin->cursor, bin->valueLen - bin->cursor);
+		if(t <= 0) goto error_input;
+		bin->cursor += t;
+		if(bin->cursor == bin->valueLen){
+			bin->reading = COMPLETED;
+			bin->cursor = 0;
+		}
 		break;
 	}
+	return 1;
 	
-	int t;
-	char buf = 0;
-	t = read(fd, &buf, 1);
+	error_input:
 
 	/* EOF */
-	if (t == 0){
+	if (t == 0) {
 		close(fd);
-		fprintf(stderr, "socket closed. fd = %i\n", fd);
-		return false;
+		goto error_die;
 	}
-
 	/* No hay más nada por ahora */
-	if (t < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-		fprintf(stderr, "nothing to read. fd = %i\n", fd);
-		return true;
-	}
-
-	/* Algún error */
 	if (t < 0) {
-		fprintf(stderr, "error en fd %i? %i\n", fd, errno);
-		return false;
+		if(errno == EAGAIN || errno == EWOULDBLOCK) {
+			return 0;
+		} else {
+			close(fd);
+			fprintf(stderr, "Error. Kill socket\n");
+			goto error_die;
+		}
 	}
 
-	if (buf == PUT) {
-		int keyLength = get_length(fd);
-		void *key = custom_malloc(table->ht, keyLength);
-		if (key == NULL) return true;
-		t = read(fd, key, keyLength);
-
-		int valueLength = get_length(fd);
-		void *value = custom_malloc(table->ht, valueLength);
-		if (value == NULL) {
-			free(key);
-			return true;
+	error_die:
+	if(bin->reading > KEY_SIZE){
+		free(bin->key);
+		if(bin->reading == VALUE){
+			free(bin->value);
 		}
-		t = read(fd, value, valueLength);
+	}
+	return -1;
+}
 
-		int i = memcached_put(table, key, keyLength, value);
+// Handler de una conexion a cliente en modo binario
+bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
+	int t;
+	start:
+	
+	if (bin->command == PUT) {
+		if(bin->reading < COMPLETED) goto read;
+		int i = memcached_put(table, bin->key, bin->keyLen, bin->value);
 		if (i == 0) {
 			int code = OK;
 			write(fd, &code, 1);
 		}
+		bin->cursor = 0;
+		bin->reading = OPERATOR;
+		bin->command = EMPTY;
 	} 
-	else if (buf == DEL)  {
-		int keyLength = get_length(fd);
-		void *key = custom_malloc(table->ht, keyLength);
-		if (key == NULL) return true;
-		t = read(fd, key, keyLength);
-
-		int i = memcached_delete(table, key, keyLength);
+	else if (bin->command == DEL)  {
+		if(bin->reading < VALUE_SIZE) goto read;
+		int i = memcached_delete(table, bin->key, bin->keyLen);
 		if (i == 0) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -130,16 +155,14 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 			int code = ENOTFOUND;
 			write(fd, &code, 1);
 		}
-		free(key);
+		free(bin->key);
+		bin->cursor = 0;
+		bin->reading = OPERATOR;
+		bin->command = EMPTY;
 	} 
-	else if (buf == GET) {
-		int keyLength = get_length(fd);
-		// fprintf(stderr, "length: %d\n", keyLength);
-		void *key = custom_malloc(table->ht, keyLength);
-		if (key == NULL) return true;
-		t = read(fd, key, keyLength);
-
-		void *value = memcached_get(table, key, keyLength);
+	else if (bin->command == GET) {
+		if(bin->reading < VALUE_SIZE) goto read;
+		void *value = memcached_get(table, bin->key, bin->keyLen);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -150,15 +173,14 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 			int code = ENOTFOUND;
 			write(fd, &code, 1);
 		}
-		free(key);
+		free(bin->key);
+		bin->cursor = 0;
+		bin->reading = OPERATOR;
+		bin->command = EMPTY;
 	} 
-	else if (buf == TAKE) {
-		int keyLength = get_length(fd);
-		void *key = custom_malloc(table->ht, keyLength);
-		if (key == NULL) return true;
-		t = read(fd, key, keyLength);
-
-		void *value = memcached_take(table, key, keyLength);
+	else if (bin->command == TAKE) {
+		if(bin->reading < VALUE_SIZE) goto read;
+		void *value = memcached_take(table, bin->key, bin->keyLen);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -168,22 +190,31 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 			int code = ENOTFOUND;
 			write(fd, &code, 1);
 		}
-		free(key);
+		free(bin->key);
 		free(value);
+		bin->cursor = 0;
+		bin->reading = OPERATOR;
+		bin->command = EMPTY;
 	} 
-	else if (buf == STATS) {
+	else if (bin->command == STATS) {
 		char* line = memcached_stats(table);
 		char code = OK;
 		write(fd, &code, 1);
 		send_length(fd, strlen(line)+1);
 		write(fd, line, strlen(line)+1);
 		free(line);
-	} 
-	else {
-		fprintf(stderr, "einval\n");
-		int code = EINVAL;
-		write(fd, &code, 1);
+		bin->cursor = 0;
+		bin->reading = OPERATOR;
+		bin->command = EMPTY;
+	} else{
+		read:
+		t = binary_read_handler(fd, bin, table);
+
+		if(t < 0) return false;
+		else if(t == 0) return true; 
+		else goto start;
 	}
+		
 	return true;
 }
 
@@ -226,20 +257,18 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 
 	/* EOF */
 	if (t == 0){
-		fprintf(stdin, "socket closed. fd = %i\n", fd);
 		close(fd);
 		return false;
 	}
 
 	/* No hay más nada por ahora */
 	if (t < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)){
-		fprintf(stdin, "nothing to read. fd = %i\n", fd);
 		return true;
 	}
 
 	/* Algún error */
 	if (t < 0) {
-		fprintf(stderr, "error en fd %i? %i\n", fd, errno);
+		fprintf(stderr, "Error. Kill socket\n");
 		close(fd);
 		return false;
 	}
