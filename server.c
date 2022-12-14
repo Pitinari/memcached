@@ -18,9 +18,9 @@
 #include <sys/resource.h>
 #include <fcntl.h>
 
-#define DATA_LIMIT 2000000
+#define DATA_LIMIT 1000000000
 #define NUM_OF_NODES 10000
-#define N_THREADS 10
+#define N_THREADS 6
 
 typedef struct sockaddr_in sin;
 typedef struct sockaddr    sad;
@@ -113,7 +113,6 @@ again:
 			die("epoll_wait");
 		}
 	}
-
 	bool state;
 	for (int i = 0; i < nev; i++) {
 		dataEvent data = (dataEvent)ev[i].data.ptr;
@@ -213,22 +212,21 @@ int main() {
 	if(register_fd(epfd, sock2, true, mc) < 0) 
 		die("error on register bin socket");
 
-	// setuid()
+	if (setgid(getgid()) < 0 || setuid(getuid()) < 0) {
+		die("error on remove privileges");
+	}
 
-	pthread_t hand[N_THREADS];
+	pthread_t hand[N_THREADS-1];
 	struct _args args;
 	args.epfd = epfd;
 	args.textSock = sock1;
 	args.binSock = sock2;
 	args.mc = mc;
 	
-	for (size_t i = 0; i < N_THREADS; i++) {
+	for (size_t i = 0; i < N_THREADS-1; i++) {
 		pthread_create(&hand[i], NULL, loop, (void *)&args);
 	}
-	
-	for (size_t i = 0; i < N_THREADS; i++) {
-		pthread_join(hand[i], NULL);
-	}
+	loop((void *)&args);
 
 	return 0;
 }

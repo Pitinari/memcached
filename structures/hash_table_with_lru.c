@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <math.h>
+#include <stdio.h>
 #include "string.h"
 #include "hash_table_with_lru.h"
 #include "../utils/hash.h"
@@ -23,6 +24,7 @@ void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList) {
 		removed = lru_deallocate(((HashTable)hashTable)->lru, currentList);
 		pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
 		numberTries++;
+    fprintf(stderr, "DEALLOCATING... %p",mem);
 	}
 	return mem;
 }

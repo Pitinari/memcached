@@ -223,6 +223,7 @@ int get_input_commands(struct text_state *text, char **commads){
 	int wordsCount = 1;
 	while(*input != '\n'){
 		if(*input == ' '){
+			if(wordsCount == 3) return -1;
 			*input = '\0';
 			*commads = lastReference;
 			commads++;
@@ -283,6 +284,12 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 
 	char *comm[3];
 	int wordsCount = get_input_commands(text, comm);
+	if(wordsCount < 0){
+		write(fd, "EINVAL\n", 8);
+		reset_input_buffer(text, comm, 3);
+		text->cursor = 0;
+		return true;
+	}
 	if (strcmp(comm[0], "STATS") == 0 && wordsCount == 1) {
 		char* stats = memcached_stats(table);
 		write(fd, "OK\n", 4);
@@ -319,13 +326,7 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 			if (value) {
 				if (1/*representable*/) {
 					write(fd, "OK\n", 4);
-					int len = strlen(value)+1;
-					if (len > 2048) {
-						write(fd, "EBIG\n", 4);
-					}
-					else {
-						write(fd, value, len);
-					}
+					write(fd, value, strlen(value)+1);
 				}
 				else {
 					write(fd, "EBINARY\n", 9);
