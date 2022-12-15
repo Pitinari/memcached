@@ -98,7 +98,7 @@ static void die(char *s, ...)
 	abort();
 }
 
-void *loop(void* arg) {
+void *handle_connections(void* arg) {
 	int nev, fd, newSock;
 	struct epoll_event ev[16];
 	struct _args loopArgs = *(args)arg;
@@ -224,9 +224,9 @@ int main() {
 	args.mc = mc;
 	
 	for (size_t i = 0; i < N_THREADS-1; i++) {
-		pthread_create(&hand[i], NULL, loop, (void *)&args);
+		pthread_create(&hand[i], NULL, handle_connections, (void *)&args);
 	}
-	loop((void *)&args);
+	handle_connections((void *)&args);
 
 	return 0;
 }

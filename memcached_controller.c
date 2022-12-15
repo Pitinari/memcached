@@ -136,7 +136,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	
 	if (bin->command == PUT) {
 		if(bin->reading < COMPLETED) goto read;
-		int i = memcached_put(table, bin->key, bin->keyLen, bin->value);
+		int i = memcached_put(table, bin->key, bin->keyLen, bin->value, bin->valueLen);
 		if (i == 0) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -162,12 +162,14 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	} 
 	else if (bin->command == GET) {
 		if(bin->reading < VALUE_SIZE) goto read;
-		void *value = memcached_get(table, bin->key, bin->keyLen);
+		void *value;
+		unsigned valueLen;
+		memcached_get(table, bin->key, bin->keyLen, &value, &valueLen);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
-			send_length(fd, sizeof(value));
-			write(fd, value, sizeof(value));
+			send_length(fd, valueLen);
+			write(fd, value, valueLen);
 		} 
 		else {
 			int code = ENOTFOUND;
@@ -180,12 +182,14 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	} 
 	else if (bin->command == TAKE) {
 		if(bin->reading < VALUE_SIZE) goto read;
-		void *value = memcached_take(table, bin->key, bin->keyLen);
+		void *value;
+		unsigned valueLen;
+		memcached_take(table, bin->key, bin->keyLen, &value, &valueLen);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
-			send_length(fd, sizeof(value));
-			write(fd, value, sizeof(value));
+			send_length(fd, valueLen);
+			write(fd, value, valueLen);
 		} else {
 			int code = ENOTFOUND;
 			write(fd, &code, 1);
@@ -276,17 +280,11 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 
 	text->cursor += t;
 
-	if(text->cursor == 2048 && text->buf[2047] != '\n'){
-		write(fd, "EINVAL\n", 8);
-		text->cursor = 0;
-		return true;
-	}
-
 	char *comm[3];
 	int wordsCount = get_input_commands(text, comm);
 	if(wordsCount < 0){
+		// Si el input esta malformado reseteamos todo el input
 		write(fd, "EINVAL\n", 8);
-		reset_input_buffer(text, comm, 3);
 		text->cursor = 0;
 		return true;
 	}
@@ -306,31 +304,24 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 			}
 		} 
 		else if (strcmp(comm[0], "GET") == 0 && wordsCount == 2) {
-			char *value = memcached_get(table, comm[1], strlen(comm[1]));
+			void *value;
+			unsigned valueLen;
+			memcached_get(table, comm[1], strlen(comm[1]), &value, &valueLen);
 			if (value) {
-				if (1/*representable*/) {
-					write(fd, "OK\n", 4);
-					write(fd, value, strlen(value)+1);
-				}
-				else {
-					write(fd, "EBINARY\n", 9);
-				}
+				write(fd, "OK\n", 4);
+				write(fd, value, valueLen);
 			} 
 			else {
 				write(fd, "ENOTFOUND\n", 11);
 			}
 		} 
 		else if (strcmp(comm[0], "TAKE") == 0 && wordsCount == 2) {
-
-			char *value = memcached_take(table, comm[1], strlen(comm[1]));
+			void *value;
+			unsigned valueLen;
+			memcached_take(table, comm[1], strlen(comm[1]), &value, &valueLen);
 			if (value) {
-				if (1/*representable*/) {
-					write(fd, "OK\n", 4);
-					write(fd, value, strlen(value)+1);
-				}
-				else {
-					write(fd, "EBINARY\n", 9);
-				}
+				write(fd, "OK\n", 4);
+				write(fd, value, valueLen);
 				free(value);
 			} else {
 				write(fd, "ENOTFOUND\n", 11);
@@ -349,7 +340,7 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 				return true; // error
 			}
 			strcpy(value, comm[2]);
-			int i = memcached_put(table, key, strlen(key), value);
+			int i = memcached_put(table, key, strlen(key), value, strlen(value));
 			if (i == 0)
 				write(fd, "OK\n", 4);
 		} 

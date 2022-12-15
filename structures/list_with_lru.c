@@ -23,10 +23,15 @@ List list_create() {
 	return list;
 }
 
-LRU lru_create(AllocationFunction custom_malloc, DestructiveFunction dest,
-								InitDeallocateFunctionLRU preprocessing, EndDeallocateFunctionLRU postprocessing,
-								OnAddElementLRU on_add_element, OnDeleteElementLRU on_delete_element,
-								void *forwardRef) {
+LRU lru_create(
+	AllocationFunction custom_malloc, 
+	DestructiveFunction dest,
+	InitDeallocateFunctionLRU preprocessing, 
+	EndDeallocateFunctionLRU postprocessing,
+	OnAddElementLRU on_add_element, 
+	OnDeleteElementLRU on_delete_element, 
+	void *forwardRef
+) {
 	LRU lru = (LRU) malloc(sizeof(struct _LRU));
 	/* Si se consiguio memoria */
 	if (lru != NULL) {
@@ -34,10 +39,18 @@ LRU lru_create(AllocationFunction custom_malloc, DestructiveFunction dest,
 		lru->rear = NULL;
 		lru->custom_malloc = custom_malloc;
 		lru->dest = dest;
+
+		// Estas son funciones a llamar antes de borrar un nodo con lru_deallocate
+		// Sirven, por ejemplo, para tomar locks y checkear a que lista pertenece un nodo
 		lru->preprocessing = preprocessing;
 		lru->postprocessing = postprocessing;
+
+		// Callbacks para llamar cuando se agregue y borre un elemento, respectivamente
 		lru->on_add_element = on_add_element;
 		lru->on_delete_element = on_delete_element;
+
+		// Es un puntero de referencia a la estructura que implemente estas listas con lru
+		// Esto se hizo con la intencion de generalizar la estructura que lo implemente
 		lru->forwardRef = forwardRef;
 	}
 	return lru;
@@ -156,14 +169,20 @@ void* list_get(List list, void *data, ComparativeFunction comp) {
 	return NULL;
 }
 
+// Funcion para borrar elementos desde la LRU
 bool lru_deallocate(LRU lru, List currentList) {
 	if (lru == NULL) return false;
 	if (lru->rear != NULL) {
 		int alreadyDeallocated = 0;
+		// Iniciamos borrando desde el ultimo nodo agregado
 		NodeLL temp = lru->rear;
 		List currentListDeallocation = NULL;
+		// Hasta borrar 10 o que las listas esten vacias
 		while(temp != NULL || alreadyDeallocated < 10) {
+			// preprocessing es para hacer los procedimientos previos a empezar a borrar un nodo
+			// currentList es para un caso borde de si deallocate se llamo mientras se inserta en la lista
 			currentListDeallocation = lru->preprocessing(lru->forwardRef, temp->data, currentList);
+			// Destruimos el nodo y acomodamos la lru y lista
 			lru->dest(temp->data);
 			lru->rear = temp->backLRU;
 
@@ -181,7 +200,9 @@ bool lru_deallocate(LRU lru, List currentList) {
 			}
 
 			temp = lru->rear;
+			// Luego, de forma similar a preprocessing, se llama a postprocessing
 			lru->postprocessing(lru->forwardRef, temp->data, currentList);
+			// Finalmente aplicamos la callback de borrar un elementos de una lista
 			lru->on_delete_element(lru->forwardRef);
 		}
 		if (temp != NULL) {
