@@ -136,14 +136,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	
 	if (bin->command == PUT) {
 		if(bin->reading < COMPLETED) goto read;
-		Data value = custom_malloc(table->ht, sizeof(struct _Data));
-		if (value == NULL) {
-			return true;
-		}
-		
-		value->value = bin->value;
-		value->len = bin->valueLen;
-		int i = memcached_put(table, bin->key, bin->keyLen, value);
+		int i = memcached_put(table, bin->key, bin->keyLen, bin->value, bin->valueLen);
 		if (i == 0) {
 			int code = OK;
 			write(fd, &code, 1);
@@ -169,12 +162,14 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	} 
 	else if (bin->command == GET) {
 		if(bin->reading < VALUE_SIZE) goto read;
-		Data value = memcached_get(table, bin->key, bin->keyLen);
+		void *value;
+		unsigned valueLen;
+		memcached_get(table, bin->key, bin->keyLen, &value, &valueLen);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
-			send_length(fd, value->len);
-			write(fd, value->value, value->len);
+			send_length(fd, valueLen);
+			write(fd, value, valueLen);
 		} 
 		else {
 			int code = ENOTFOUND;
@@ -187,18 +182,19 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	} 
 	else if (bin->command == TAKE) {
 		if(bin->reading < VALUE_SIZE) goto read;
-		Data value = memcached_take(table, bin->key, bin->keyLen);
+		void *value;
+		unsigned valueLen;
+		memcached_take(table, bin->key, bin->keyLen, &value, &valueLen);
 		if (value != NULL) {
 			int code = OK;
 			write(fd, &code, 1);
-			send_length(fd, value->len);
-			write(fd, value->value, value->len);
+			send_length(fd, valueLen);
+			write(fd, value, valueLen);
 		} else {
 			int code = ENOTFOUND;
 			write(fd, &code, 1);
 		}
 		free(bin->key);
-		free(value->value);
 		free(value);
 		bin->cursor = 0;
 		bin->reading = OPERATOR;
@@ -307,48 +303,43 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 			}
 		} 
 		else if (strcmp(comm[0], "GET") == 0 && wordsCount == 2) {
-			Data value = memcached_get(table, comm[1], strlen(comm[1]));
+			void *value;
+			unsigned valueLen;
+			memcached_get(table, comm[1], strlen(comm[1]), &value, &valueLen);
 			if (value) {
 				write(fd, "OK\n", 4);
-				write(fd, value->value, value->len);
+				write(fd, value, valueLen);
 			} 
 			else {
 				write(fd, "ENOTFOUND\n", 11);
 			}
 		} 
 		else if (strcmp(comm[0], "TAKE") == 0 && wordsCount == 2) {
-			Data value = memcached_take(table, comm[1], strlen(comm[1]));
+			void *value;
+			unsigned valueLen;
+			memcached_take(table, comm[1], strlen(comm[1]), &value, &valueLen);
 			if (value) {
 				write(fd, "OK\n", 4);
-				write(fd, value->value, value->len);
-				free(value->value);
+				write(fd, value, valueLen);
 				free(value);
 			} else {
 				write(fd, "ENOTFOUND\n", 11);
 			}
 		} 
 		else if (strcmp(comm[0], "PUT") == 0 && wordsCount == 3) {
-			unsigned keyLen = strlen(comm[1]);
 			char *key = custom_malloc(table->ht, strlen(comm[1]) + 1);
 			if(key == NULL){
 				return true; // error
 			}
 			strcpy(key, comm[1]);
-			Data value = custom_malloc(table->ht, sizeof(struct _Data));
-			if(value == NULL){
+
+			char *value = custom_malloc(table->ht, strlen(comm[2]) + 1);
+			if(value == NULL) {
 				free(key);
 				return true; // error
 			}
-			unsigned strLen = strlen(comm[2]) + 1;
-			value->value = custom_malloc(table->ht, strLen);
-			if(value->value == NULL) {
-				free(key);
-				free(value);
-				return true; // error
-			}
-			strcpy(value->value, comm[2]);
-			value->len = strLen;
-			int i = memcached_put(table, key, keyLen, value);
+			strcpy(value, comm[2]);
+			int i = memcached_put(table, key, strlen(key), value, strlen(value));
 			if (i == 0)
 				write(fd, "OK\n", 4);
 		} 

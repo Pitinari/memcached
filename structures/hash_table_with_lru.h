@@ -26,6 +26,7 @@ struct _NodeHT {
   void *key;
   unsigned keyLen;
   void *value;
+  unsigned valueLen;
   unsigned hashedKey;
 };
 /* Nodo de la hash table */
@@ -41,11 +42,11 @@ unsigned hashtable_nelems(HashTable table);
 void hashtable_destroy(HashTable table);
 
 /* Inserta un dato en la tabla, o lo reemplaza si ya se encontraba */
-void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value);
+void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, unsigned valueLen);
 
 /*Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
 buscado no se encuentra en la tabla */
-void *hashtable_search(HashTable table, void *key, unsigned keyLen);
+void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value, unsigned *valueLen);
 
 /* Elimina el dato de la tabla que coincida con el dato dado */
 void *hashtable_take(HashTable table, void *key, unsigned keyLen);
@@ -55,7 +56,7 @@ void *custom_malloc(HashTable hashTable, size_t size);
 
 /* Funcion para crear nodos de la hash table */
 NodeHT nodeht_create(HashTable hashTable, void *key, unsigned keyLen,
-											void *value, unsigned hashedKey);
+											void *value, unsigned valueLen, unsigned hashedKey);
 
 /* Libera la memoria del nodo */
 void nodeht_destroy(NodeHT node);
