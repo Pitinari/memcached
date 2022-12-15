@@ -1,40 +1,33 @@
 -module(test).
--export(spawner/3, test/1)
+-export([test/1, client/3]).
 -import(cli_bin, [put/3, del/2, get/2, take/2, stats/1, start/0, close/1]).
--import(cli_text, [put/3, del/2, get/2, take/2, stats/1, start/0, close/1]).
+%-import(cli_text, [put/3, del/2, get/2, take/2, stats/1, start/0, close/1]).
 
-spawner(Port, N, FunctionIdx, Module, FatherPid) ->
+recv(N) ->
 	case N of
-		0 ->  FatherPid ! ok;
-		N ->  case FunctionIdx of
-						1 -> spawn(Module, put, [Port, N, N]),
-								spawner(Port, N - 1, FunctionIdx);
-						2 -> spawn(Module, del, [Port, N]),
-								spawner(Port, N - 1, FunctionIdx);
-						3 -> spawn(Module, get, [Port, N]),
-								spawner(Port, N - 1, FunctionIdx);
-						4 -> spawn(Module, take, [Port, N]),
-								spawner(Port, N - 1, FunctionIdx);
-						5 -> spawn(Module, stats, [Port]),
-								spawner(Port, N - 1, FunctionIdx)
-					end
+		0 -> ok;
+		N -> 	receive
+						ok -> recv(N-1);
+						_ -> recv(N)
+				 	end
 	end.
 
+client(Port, N, FatherPid) ->
+	cli_bin:put(Port, N, N),
+	cli_bin:get(Port, N),
+	cli_bin:del(Port, N),
+	FatherPid ! ok.
 
-test(N, Module) ->
-	case start() of
-		{ok, Port} -> spawner(Port, N, 1, Module, getpid()),
-									receive
-										ok -> ok
-									end,
-									spawner(Port, N, 3, Module, getpid()),
-									receive
-										ok -> ok
-									end,
-									spawner(Port, N, 2, Module, getpid()),
-									receive
-										ok -> ok
-									end,
-									Module:stats(Port);
-		Error -> Error
+test(N) ->
+	case N of			
+		0 -> recv(N),
+				 case start() of
+					{ok, Port} -> cli_bin:stats(Port);
+					Error -> Error
+				 end;
+		N -> case start() of
+					{ok, Port} -> spawn(test, client, [Port, N, self()]),
+												test(N-1);
+					Error -> Error
+				 end
 	end. 
