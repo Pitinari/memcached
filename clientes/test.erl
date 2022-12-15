@@ -19,6 +19,14 @@ client(Port, N, FatherPid) ->
 	cli_bin:close(Port),
 	FatherPid ! ok.
 
+% client(Port, N, FatherPid) ->
+% 	cli_text:put(Port, integer_to_list(N), integer_to_list(N)),
+% 	cli_text:get(Port, integer_to_list(N)),
+% 	cli_text:del(Port, integer_to_list(N)),
+% 	cli_text:close(Port),
+% 	FatherPid ! ok.
+% change cli_bin to cli_text
+
 test(N) ->
 	test_aux(N, N).
 
