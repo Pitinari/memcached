@@ -58,6 +58,13 @@ struct text_state {
 	char buf[2048];
 };
 
+struct _Data {
+	void *value;
+	unsigned len;
+};
+typedef struct _Data *Data;
+
+
 // Handler de una conexion a cliente en modo binario
 bool binary_handler(int fd, struct bin_state *bin, Memcached table);
 

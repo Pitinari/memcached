@@ -22,27 +22,32 @@ Memcached memcached_create(unsigned size){
 	return NULL;
 }
 
-int memcached_put(Memcached mc, void* key, unsigned keyLen, void *value, unsigned valueLen) {
+int memcached_put(Memcached mc, void* key, unsigned keyLen, void *value) {
 	atomic_fetch_add(&mc->puts, 1);
-	hashtable_insert(mc->ht, key, keyLen, value, valueLen);
+	hashtable_insert(mc->ht, key, keyLen, value);
 	return 0;
 }
 
-void memcached_get(Memcached mc, void *key, unsigned keyLen, void **value, unsigned *valueLen) {
+void *memcached_get(Memcached mc, void *key, unsigned keyLen) {
 	atomic_fetch_add(&mc->gets, 1);
-	hashtable_search(mc->ht, key, keyLen, value, valueLen);
+	NodeHT node = hashtable_search(mc->ht, key, keyLen);
+	if (node != NULL) {
+		return node->value;
+	}
+	return NULL;
 }
 
 // si existe el nodo, guarda el valor y su largo en sus respectivos punteros y libera el resto del nodo 
-void memcached_take(Memcached mc, void *key, unsigned keyLen, void **value, unsigned *valueLen) {
+void *memcached_take(Memcached mc, void *key, unsigned keyLen) {
 	atomic_fetch_add(&mc->takes, 1);
 	NodeHT node = hashtable_take(mc->ht, key, keyLen);
 	if (node) {
-		*value = node->value;
-		*valueLen = node->valueLen;
+		void *value = node->value;
 		free(node->key);
 		free(node);
+		return value;
 	}
+	return NULL;
 }
 
 int memcached_delete(Memcached mc, void *key, unsigned keyLen) {

@@ -15,11 +15,11 @@ typedef struct _Memcached *Memcached;
 
 Memcached memcached_create(unsigned size_hashtable);
 
-int memcached_put(Memcached mc, void* key, unsigned keyLen, void *value, unsigned valueLen);
+int memcached_put(Memcached mc, void* key, unsigned keyLen, void *value);
 
-void memcached_get(Memcached mc, void *key, unsigned keyLen, void **value, unsigned *valueLen);
+void *memcached_get(Memcached mc, void *key, unsigned keyLen);
 
-void memcached_take(Memcached mc, void *key, unsigned keyLen, void **value, unsigned *valueLen);
+void *memcached_take(Memcached mc, void *key, unsigned keyLen);
 
 int memcached_delete(Memcached mc, void *key, unsigned keyLen);
 
