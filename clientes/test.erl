@@ -16,18 +16,22 @@ client(Port, N, FatherPid) ->
 	cli_bin:put(Port, N, N),
 	cli_bin:get(Port, N),
 	cli_bin:del(Port, N),
+	cli_bin:close(Port),
 	FatherPid ! ok.
 
 test(N) ->
+	test_aux(N, N).
+
+test_aux(N, M) ->
 	case N of			
-		0 -> recv(N),
+		0 -> recv(M),
 				 case start() of
 					{ok, Port} -> cli_bin:stats(Port);
 					Error -> Error
 				 end;
 		N -> case start() of
 					{ok, Port} -> spawn(test, client, [Port, N, self()]),
-												test(N-1);
+												test_aux(N-1, M);
 					Error -> Error
 				 end
 	end. 
