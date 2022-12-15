@@ -183,12 +183,12 @@ void hashtable_destroy(HashTable table) {
 		free(table->lists_locks);
 		free(table->lru_lock);
 		free(table);
-	}	
+	}
 }
 
 // si existe el value cambia se lo asigna al puntero pasado como value, junto con su largo
 void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value, unsigned *valueLen) {
-	if (table == NULL) return; 
+	if (table == NULL) return;
 	unsigned hashedKey = hash_function(key, keyLen);
 	unsigned idx = hashedKey % table->size;
 	struct _NodeHT data = { key, keyLen, NULL, 0, hashedKey };
@@ -201,22 +201,26 @@ void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value,
 }
 
 void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, unsigned valueLen) {
-	if (table == NULL) return; 
+	if (table == NULL) return;
 	unsigned hashedKey = hash_function(key, keyLen);
 	unsigned idx = hashedKey % table->size;
 	NodeHT data = nodeht_create(table, key, keyLen, value, valueLen, hashedKey);
+	pthread_mutex_lock(table->lru_lock);
 	pthread_mutex_lock(table->lists_locks[idx]);
 	list_put(table->lists[idx], table->lru, (void *)data, comparate_keys);
 	pthread_mutex_unlock(table->lists_locks[idx]);
+	pthread_mutex_unlock(table->lru_lock);
 }
 
 void *hashtable_take(HashTable table, void *key, unsigned keyLen) {
-	if (table == NULL) return NULL; 
+	if (table == NULL) return NULL;
 	unsigned hashedValue = hash_function(key, keyLen);
 	unsigned idx = hashedValue % table->size;
-	struct _NodeHT data = { key, keyLen, NULL, hashedValue };
+	struct _NodeHT data = { key, keyLen, NULL, 0, hashedValue };
+	pthread_mutex_lock(table->lru_lock);
 	pthread_mutex_lock(table->lists_locks[idx]);
 	NodeHT returnValue = (NodeHT)list_take(table->lists[idx], table->lru, (void *)&data, comparate_keys);
 	pthread_mutex_unlock(table->lists_locks[idx]);
+	pthread_mutex_unlock(table->lru_lock);
 	return returnValue;
 }

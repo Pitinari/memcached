@@ -59,7 +59,7 @@ char *memcached_stats(Memcached mc){
 	char *str = custom_malloc(mc->ht, 100);
 	sprintf(
 		str, 
-		"PUTS=%u DELS=%u TAKES=%u GETS=%u KEYS=%u\n", 
+		"PUTS=%llu DELS=%llu TAKES=%llu GETS=%llu KEYS=%llu\n", 
 		mc->puts, mc->dels, mc->takes, mc->gets, mc->ht->numElems);
 	return str;
 }

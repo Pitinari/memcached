@@ -5,10 +5,10 @@
 
 struct _Memcached {
     HashTable ht;
-    atomic_uint puts;
-    atomic_uint dels;
-    atomic_uint gets;
-    atomic_uint takes;
+    atomic_ullong puts;
+    atomic_ullong dels;
+    atomic_ullong gets;
+    atomic_ullong takes;
 };
 
 typedef struct _Memcached *Memcached; 

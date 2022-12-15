@@ -215,10 +215,9 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		t = binary_read_handler(fd, bin, table);
 
 		if(t < 0) return false;
-		else if(t == 0) return true; 
+		else if(t == 0) return true;
 		else goto start;
 	}
-		
 	return true;
 }
 

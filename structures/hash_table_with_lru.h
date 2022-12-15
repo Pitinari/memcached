@@ -16,7 +16,7 @@ struct _HashTable {
   LRU lru;
   pthread_mutex_t *lru_lock;
   unsigned size;
-  atomic_int numElems;
+  atomic_ullong numElems;
 };
 /* Estructura principal que representa la tabla hash */
 typedef struct _HashTable *HashTable;
