@@ -37,6 +37,7 @@ bool validate_operation(int op){
 	return op == PUT || op == DEL || op == GET || op == TAKE || op == STATS;
 }
 
+// Lee del fd y va llenando los campos correspondientes al comando
 int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 	int t;
 	switch (bin->reading)
@@ -170,6 +171,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 			write(fd, &code, 1);
 			send_length(fd, valueLen);
 			write(fd, value, valueLen);
+			free(value);
 		} 
 		else {
 			int code = ENOTFOUND;
@@ -202,11 +204,18 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	} 
 	else if (bin->command == STATS) {
 		char* line = memcached_stats(table);
-		char code = OK;
-		write(fd, &code, 1);
-		send_length(fd, strlen(line)+1);
-		write(fd, line, strlen(line)+1);
-		free(line);
+		if(line != NULL){
+			char code = OK;
+			write(fd, &code, 1);
+			send_length(fd, strlen(line)+1);
+			write(fd, line, strlen(line)+1);
+			free(line);
+		} else {
+			// Tuve un error, me olvido del comando
+			// y mando "error unknown"
+			char code = EUNK;
+			write(fd, &code, 1);
+		}
 		bin->cursor = 0;
 		bin->reading = OPERATOR;
 		bin->command = EMPTY;
@@ -309,13 +318,14 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 			if (value) {
 				write(fd, "OK\n", 4);
 				write(fd, value, valueLen);
+				free(value);
 			} 
 			else {
 				write(fd, "ENOTFOUND\n", 11);
 			}
 		} 
 		else if (strcmp(comm[0], "TAKE") == 0 && wordsCount == 2) {
-			void *value;
+			void *value = NULL;
 			unsigned valueLen;
 			memcached_take(table, comm[1], strlen(comm[1]), &value, &valueLen);
 			if (value) {
@@ -346,6 +356,8 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 		else {
 			write(fd, "EINVAL\n", 8);
 		}
+	} else {
+		write(fd, "EINVAL\n", 8);
 	}
 	reset_input_buffer(text, comm, wordsCount);
 	return true;

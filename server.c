@@ -18,7 +18,7 @@
 #include <sys/resource.h>
 #include <fcntl.h>
 
-#define DATA_LIMIT 1000000000
+#define DATA_LIMIT 1000000000 // con 1190000 bytes se ve bien el uso del deallocate con mas de 500 conexiones
 #define NUM_OF_NODES 10000
 #define N_THREADS 6
 
@@ -131,6 +131,7 @@ again:
 			if(((dataEvent)ev[i].data.ptr)->bin) {
 				state = binary_handler(fd, data->input_state.bin, loopArgs.mc);
 			} else {
+
 				state = text_handler(fd, data->input_state.text, loopArgs.mc);
 			}
 			if(state){

@@ -15,7 +15,7 @@ recv(N) ->
 client(Port, N, FatherPid) ->
 	cli_bin:put(Port, N, N),
 	cli_bin:get(Port, N),
-	cli_bin:del(Port, N),
+	% cli_bin:del(Port, N), %Comentado para probar el deallocate
 	cli_bin:close(Port),
 	FatherPid ! ok.
 

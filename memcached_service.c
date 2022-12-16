@@ -57,6 +57,7 @@ int memcached_delete(Memcached mc, void *key, unsigned keyLen) {
 
 char *memcached_stats(Memcached mc){
 	char *str = custom_malloc(mc->ht, 100);
+	if(str == NULL) return NULL;
 	sprintf(
 		str, 
 		"PUTS=%llu DELS=%llu TAKES=%llu GETS=%llu KEYS=%llu\n", 

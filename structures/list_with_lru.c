@@ -178,32 +178,39 @@ bool lru_deallocate(LRU lru, List currentList) {
 		NodeLL temp = lru->rear;
 		List currentListDeallocation = NULL;
 		// Hasta borrar 10 o que las listas esten vacias
-		while(temp != NULL || alreadyDeallocated < 10) {
+		while(temp != NULL && alreadyDeallocated < 10) {
 			// preprocessing es para hacer los procedimientos previos a empezar a borrar un nodo
 			// currentList es para un caso borde de si deallocate se llamo mientras se inserta en la lista
+
 			currentListDeallocation = lru->preprocessing(lru->forwardRef, temp->data, currentList);
-			// Destruimos el nodo y acomodamos la lru y lista
-			lru->dest(temp->data);
-			lru->rear = temp->backLRU;
+			// Si el preprocessing devuelve NULL, implica que hubo un error con el nodo y se saltea
+			if(currentListDeallocation){ // Si devolvio la lista
+				// Acomodamos la LRU
+				lru->rear = temp->backLRU;
 
-			if(temp->nextList){
-				temp->nextList->backList = temp->backList;
-			}
-			if(temp->backList){
-				temp->backList->nextList = temp->nextList;
-			}
-			if(currentListDeallocation->front == temp){
-				currentListDeallocation->front = temp->nextList;
-			}
-			if(currentListDeallocation->rear == temp){
-				currentListDeallocation->rear = temp->backList;
-			}
+				if(temp->nextList){
+					temp->nextList->backList = temp->backList;
+				}
+				if(temp->backList){
+					temp->backList->nextList = temp->nextList;
+				}
+				if(currentListDeallocation->front == temp){
+					currentListDeallocation->front = temp->nextList;
+				}
+				if(currentListDeallocation->rear == temp){
+					currentListDeallocation->rear = temp->backList;
+				}
 
+				// Luego, de forma similar a preprocessing, se llama a postprocessing
+				lru->postprocessing(lru->forwardRef, temp->data, currentList);
+				// Finalmente aplicamos la callback de borrar un elementos de una lista
+				lru->on_delete_element(lru->forwardRef);
+				// Destruimos el nodo
+				lru->dest(temp->data);
+				free(temp);
+			}
+			alreadyDeallocated++;
 			temp = lru->rear;
-			// Luego, de forma similar a preprocessing, se llama a postprocessing
-			lru->postprocessing(lru->forwardRef, temp->data, currentList);
-			// Finalmente aplicamos la callback de borrar un elementos de una lista
-			lru->on_delete_element(lru->forwardRef);
 		}
 		if (temp != NULL) {
 			temp->nextLRU = NULL;
