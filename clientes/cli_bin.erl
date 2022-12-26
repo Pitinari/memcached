@@ -1,5 +1,5 @@
 -module(cli_bin).
--export([put/2, del/1, get/1, take/1, stats/0, start/0, start_aux/0, close/1, code/1]).
+-export([put/2, del/1, get/1, take/1, stats/0, start/0, start_aux/0, close/0, code/1]).
 
 -define(PUT, 11).
 -define(DEL, 12).
@@ -27,7 +27,7 @@ put(K, V) ->
 put(Sock, K, V) ->
   case gen_tcp:send(Sock, <<?PUT, (code(K))/binary, (code(V))/binary >> ) of
     ok -> case gen_tcp:recv(Sock, 1) of
-            {ok, ?OK} -> ok;
+            {ok, <<?OK>>} -> ok;
             {ok, Code} -> {ok, Code};
             {error, Reason} -> {error, Reason}
           end;
@@ -127,6 +127,7 @@ wait_for_clients(Socket) ->
 											wait_for_clients(Socket);
 		{PId, stats} -> PId ! stats(Socket),
 										wait_for_clients(Socket);
+    close -> gen_tcp:close(Socket);
 		_ -> wait_for_clients(Socket)
 	end.
 
@@ -139,4 +140,4 @@ start_aux() ->
 start() ->
 	spawn(cli_bin, start_aux, []).	
 
-close(Sock) -> gen_tcp:close(Sock).
+close() -> server ! close.

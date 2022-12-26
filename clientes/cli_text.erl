@@ -1,6 +1,16 @@
 -module(cli_text).
 -export([put/2, del/1, get/1, take/1, stats/0, start/0, start_aux/0, close/1]).
 
+recv(Socket, Remainder) ->
+	case gen_tcp:recv(Socket, 0) of
+		{ok, Packet} -> case lists:suffix("\n", Packet) of
+											true -> {ok, lists:concat([Remainder, Packet])};
+											false -> recv(Socket, lists:concat([Remainder, Packet]))
+										end;
+		Error -> Error
+	end.
+
+
 put(K, V) ->
 	server ! {self(), put, K, V},
 	receive
@@ -9,7 +19,7 @@ put(K, V) ->
 	end.
 put(Socket, K, V)->
  case gen_tcp:send(Socket, "PUT " ++ K ++ " " ++ V ++ "\n") of
-		ok -> case gen_tcp:recv(Socket, 0) of
+		ok -> case recv(Socket, []) of
 						{ok, Packet} -> {ok, Packet};
 						Error -> Error
 					end;
@@ -24,7 +34,7 @@ del(K) ->
 	end.
 del(Socket, K) ->
 	case gen_tcp:send(Socket, "DEL " ++ K ++ "\n") of
-		ok -> case gen_tcp:recv(Socket, 0) of
+		ok -> case recv(Socket, []) of
 						{ok, Packet} -> {ok, Packet};
 						Error -> Error
 					end;
@@ -39,7 +49,7 @@ get(K) ->
 	end.
 get(Socket, K) ->
 	case gen_tcp:send(Socket, "GET " ++ K ++ "\n") of
-		ok -> case gen_tcp:recv(Socket, 0) of
+		ok -> case recv(Socket, []) of
 						{ok, Packet} -> {ok, Packet};
 						Error -> Error
 					end;
@@ -54,7 +64,7 @@ take(K) ->
 	end.
 take(Socket, K) ->
 	case gen_tcp:send(Socket, "TAKE " ++ K ++ "\n") of
-		ok -> case gen_tcp:recv(Socket, 0) of
+		ok -> case recv(Socket, []) of
 						{ok, Packet} -> {ok, Packet};
 						Error -> Error
 					end;
@@ -69,7 +79,7 @@ stats() ->
 	end.
 stats(Socket) ->
 	case gen_tcp:send(Socket, "STATS\n") of
-		ok -> case gen_tcp:recv(Socket, 0) of
+		ok -> case recv(Socket, []) of
 						{ok, Packet} -> {ok, Packet};
 						Error -> Error
 					end;
