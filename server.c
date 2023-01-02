@@ -67,6 +67,8 @@ int register_fd(int epfd, int fd, bool bin, Memcached mc) {
 		data->input_state.text = custom_malloc(mc->ht, sizeof(struct text_state));
 		if(data->input_state.text == NULL) goto error;
 		data->input_state.text->cursor = 0;
+		data->input_state.text->wordsCount = 0;
+		data->input_state.text->lastReference = data->input_state.text->buf;
 	}
 	ev.events = EPOLLIN | EPOLLONESHOT;
 	ev.data.ptr = (void *)data;

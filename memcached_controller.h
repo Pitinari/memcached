@@ -55,7 +55,10 @@ struct bin_state {
 
 struct text_state {
 	size_t cursor;
+	int wordsCount;
 	char buf[2048];
+	char *comm[3];
+	char *lastReference;
 };
 
 // Handler de una conexion a cliente en modo binario
