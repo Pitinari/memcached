@@ -1,0 +1,4 @@
+PUT k v
+TAKE k
+GET k
+STATS

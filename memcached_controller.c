@@ -230,23 +230,25 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	return true;
 }
 
+/* Retorna cuantos caracteres se movio hasta encontrar \n o 0 si no se encontro */
 int get_input_commands(struct text_state *text, int t){
-	for (int i = text->cursor; i < t; i++) {
-		if(text->buf[i] == ' '){
-			text->buf[i] = '\0';
+	for (int i = 0; i < t; i++) {
+		if(text->buf[text->cursor + i] == ' '){
+			text->buf[text->cursor + i] = '\0';
 			if (text->wordsCount < 3) {
 				text->comm[text->wordsCount] = text->lastReference;
-				text->wordsCount++;
 			}
-			text->lastReference = text->buf + i + 1;
-		} else if (text->buf[i] == '\n') {
-			text->buf[i] = '\0';
+			text->wordsCount++;
+			text->lastReference = text->buf + text->cursor + i + 1;
+		} else if (text->buf[text->cursor + i] == '\n') {
+			text->buf[text->cursor + i] = '\0';
 			if (text->wordsCount < 3) {
 				text->comm[text->wordsCount] = text->lastReference;
-				text->wordsCount++;
 			}
-			text->lastReference = text->buf + i + 1;
-			return t - text->cursor;
+			text->wordsCount++;
+			text->cursor += i + 1;
+			text->lastReference = text->buf + text->cursor;
+			return i + 1;
 		}
 	}
 	text->cursor += t;
@@ -257,8 +259,8 @@ void reset_input_buffer(struct text_state *text, int t, int rc) {
 	for (int i = 0; rc + i < t; i++)	{
 		text->buf[i] = text->buf[text->cursor + i];
 	}
-	text->cursor = t - rc;
-	text->lastReference = text->buf + text->cursor;
+	text->cursor = 0;
+	text->lastReference = text->buf;
 	text->wordsCount = 0;
 }
 
@@ -284,8 +286,10 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 		close(fd);
 		return false;
 	}
-
+again:
 	int rc = get_input_commands(text, t);
+	// fprintf(stderr, "'%s' '%s' '%s'\n", text->comm[0], text->comm[1], text->comm[2]);
+	// fprintf(stderr, "'%s' '%s' '%ld'\n", text->buf, text->lastReference, text->cursor);
 	if (rc == 0) return true; // falta leer
 	if (strcmp(text->comm[0], "STATS") == 0 && text->wordsCount == 1) {
 		char* stats = memcached_stats(table);
@@ -354,5 +358,7 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 		write(fd, "EINVAL\n", 7);
 	}
 	reset_input_buffer(text, t, rc);
+	t -= rc;
+	goto again;
 	return true;
 }

@@ -60,7 +60,7 @@ char *memcached_stats(Memcached mc){
 	if(str == NULL) return NULL;
 	sprintf(
 		str, 
-		"PUTS=%llu DELS=%llu TAKES=%llu GETS=%llu KEYS=%llu\n", 
+		"PUTS=%llu DELS=%llu TAKES=%llu GETS=%llu KEYS=%llu", 
 		mc->puts, mc->dels, mc->takes, mc->gets, mc->ht->numElems);
 	return str;
 }
