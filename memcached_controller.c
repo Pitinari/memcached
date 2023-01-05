@@ -1,10 +1,3 @@
-/* Verificar mallocs no NULL y liberar memoria
- * Verificar lecturas (t < 0)
- * Crear funciones que manejan la cache (put, get, ...)
- * Verificar si los valores son representables como strings
- * Verificar el tamaño de los valores en binario recibidos de la cache
- */
-
 #include <unistd.h>
 #include <netinet/in.h>
 #include <string.h>
@@ -40,23 +33,20 @@ bool validate_operation(int op){
 // Lee del fd y va llenando los campos correspondientes al comando
 int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 	int t;
-	switch (bin->reading)
-	{
+	switch (bin->reading)	{
 	case OPERATOR:
 		t = read(fd, &bin->command, 1);
-		if(t <= 0) goto error_input;
+		if(t <= 0) break;
 		if(!validate_operation(bin->command)){
-			fprintf(stderr, "EINVAL BINARY\n");
-			int code = EINVAL;
+			int code = EINVALID;
 			write(fd, &code, 1);
 			return 0;
 		}
 		bin->reading = KEY_SIZE;
 		break;
 	case KEY_SIZE:
-
 		t = read(fd, bin->sizeBuf + bin->cursor, 4 - bin->cursor);
-		if(t <= 0) goto error_input;
+		if(t <= 0) break;
 		bin->cursor += t;
 		if(bin->cursor == 4){
 			bin->keyLen = ntohl(*(unsigned *)bin->sizeBuf);
@@ -68,7 +58,7 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 		break;
 	case KEY:
 		t = read(fd, bin->key + bin->cursor, bin->keyLen - bin->cursor);
-		if(t <= 0) goto error_input;
+		if(t <= 0) break;
 		bin->cursor += t;
 		if(bin->cursor == bin->keyLen){
 			bin->reading = VALUE_SIZE;
@@ -77,7 +67,7 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 		break;
 	case VALUE_SIZE:
 		t = read(fd, bin->sizeBuf + bin->cursor, 4 - bin->cursor);
-		if(t <= 0) goto error_input;
+		if(t <= 0) break;
 		bin->cursor += t;
 		if(bin->cursor == 4){
 			bin->reading = VALUE;
@@ -92,7 +82,7 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 		break;
 	case VALUE:
 		t = read(fd, bin->value + bin->cursor, bin->valueLen - bin->cursor);
-		if(t <= 0) goto error_input;
+		if(t <= 0) break;
 		bin->cursor += t;
 		if(bin->cursor == bin->valueLen){
 			bin->reading = COMPLETED;
@@ -100,27 +90,18 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 		}
 		break;
 	}
-	return 1;
-	
-	error_input:
-
-	/* EOF */
-	if (t == 0) {
+	if (t > 0) return 1;
+	else if (t == 0) { /* EOF */
 		close(fd);
-		goto error_die;
 	}
-	/* No hay más nada por ahora */
-	if (t < 0) {
+	else { /* t < 0, No hay más nada por ahora */
 		if(errno == EAGAIN || errno == EWOULDBLOCK) {
 			return 0;
 		} else {
 			close(fd);
-			fprintf(stderr, "Error. Kill socket\n");
-			goto error_die;
 		}
 	}
 
-	error_die:
 	if(bin->reading > KEY_SIZE){
 		free(bin->key);
 		if(bin->reading == VALUE){
