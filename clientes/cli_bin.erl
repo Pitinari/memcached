@@ -7,11 +7,7 @@
 -define(TAKE, 14).
 -define(STATS, 21).
 -define(OK, 101).
--define(EINVAL, 111).
 -define(ENOTFOUND, 112).
--define(EBINARY, 113).
--define(EBIG, 114).
--define(EUNK, 115).
 
 code(Data) ->
   Bin = term_to_binary(Data),
@@ -42,8 +38,8 @@ del(Server, K) ->
 del_(Sock, K) ->
   case gen_tcp:send(Sock, <<?DEL, (code(K))/binary >> ) of
     ok -> case gen_tcp:recv(Sock, 1) of
-            {ok, <<?OK>>} -> {ok, ok};
-            {ok, <<?ENOTFOUND>>} -> {ok, enotfound};
+            {ok, <<?OK>>} -> ok;
+            {ok, <<?ENOTFOUND>>} -> enotfound;
             {ok, Code} -> {ok, Code};
             {error, Reason} -> {error, Reason}
           end;
@@ -65,7 +61,7 @@ get_(Sock, K) ->
                                                 end;
                               {error, Reason} -> {error, Reason}
                             end;
-            {ok, <<?ENOTFOUND>>} -> {ok, enotfound};
+            {ok, <<?ENOTFOUND>>} -> enotfound;
             {ok, Code} -> {ok, Code};
             {error, Reason} -> {error, Reason}
           end;
@@ -87,7 +83,7 @@ take_(Sock, K) ->
                                             end;
                               {error, Reason} -> {error, Reason}
                             end;
-            {ok, <<?ENOTFOUND>>} -> {ok, enotfound};
+            {ok, <<?ENOTFOUND>>} -> enotfound;
             {ok, Code} -> {ok, Code};
             {error, Reason} -> {error, Reason}
           end;
