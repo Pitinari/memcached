@@ -1,5 +1,5 @@
 -module(cli_bin).
--export([put/3, del/2, get/2, take/2, stats/1, start/0, close/1, code/1]).
+-export([put/3, del/2, get/2, take/2, stats/1, start/0, close/1, wait_for_clients/1]).
 
 -define(PUT, 11).
 -define(DEL, 12).
@@ -133,7 +133,7 @@ wait_for_clients(Socket) ->
 
 start() ->
 	case gen_tcp:connect("localhost", 889, [binary, {active, false}, {packet, raw}]) of
-		{ok, Socket} -> {ok, spawn(wait_for_clients(Socket))};
+		{ok, Socket} -> {ok, spawn(?MODULE, wait_for_clients, [Socket])};
 		Error-> Error
 	end.
 
