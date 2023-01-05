@@ -1,5 +1,5 @@
 -module(cli_bin).
--export([put/2, del/1, get/1, take/1, stats/0, start/0, start_aux/0, close/0, code/1]).
+-export([put/3, del/2, get/2, take/2, stats/1, start/0, close/1, code/1]).
 
 -define(PUT, 11).
 -define(DEL, 12).
@@ -19,12 +19,12 @@ code(Data) ->
   BSize = <<Size:32>>,
   <<BSize/binary, Bin/binary>>.
 
-put(K, V) ->
-	server ! {self(), put, K, V},
+put(Server, K, V) ->
+	Server ! {self(), put, K, V},
 	receive
     Result -> Result
 	end.
-put(Sock, K, V) ->
+put_(Sock, K, V) ->
   case gen_tcp:send(Sock, <<?PUT, (code(K))/binary, (code(V))/binary >> ) of
     ok -> case gen_tcp:recv(Sock, 1) of
             {ok, <<?OK>>} -> ok;
@@ -34,12 +34,12 @@ put(Sock, K, V) ->
     {error, Reason} -> {error, Reason}
   end.
 
-del(K) ->
-	server ! {self(), del, K},
+del(Server, K) ->
+	Server ! {self(), del, K},
 	receive
 		Result -> Result
 	end.
-del(Sock, K) ->
+del_(Sock, K) ->
   case gen_tcp:send(Sock, <<?DEL, (code(K))/binary >> ) of
     ok -> case gen_tcp:recv(Sock, 1) of
             {ok, <<?OK>>} -> {ok, ok};
@@ -50,12 +50,12 @@ del(Sock, K) ->
     {error, Reason} -> {error, Reason}
   end.
 
-get(K) ->
-	server ! {self(), get, K},
+get(Server, K) ->
+	Server ! {self(), get, K},
 	receive
 		Result -> Result
 	end.
-get(Sock, K) ->
+get_(Sock, K) ->
   case gen_tcp:send(Sock, <<?GET, (code(K))/binary>> ) of
     ok -> case gen_tcp:recv(Sock, 1) of
             {ok, <<?OK>>} -> case gen_tcp:recv(Sock, 4) of
@@ -72,12 +72,12 @@ get(Sock, K) ->
     {error, Reason} -> {error, Reason}
   end.
 
-take(K) ->
-	server ! {self(), take, K},
+take(Server, K) ->
+	Server ! {self(), take, K},
 	receive
 		Result -> Result
 	end.
-take(Sock, K) ->
+take_(Sock, K) ->
   case gen_tcp:send(Sock, <<?TAKE, (code(K))/binary>> ) of
     ok -> case gen_tcp:recv(Sock, 1) of
             {ok, <<?OK>>} -> case gen_tcp:recv(Sock, 4) of
@@ -94,12 +94,12 @@ take(Sock, K) ->
     {error, Reason} -> {error, Reason}
   end.
 
-stats() ->
-	server ! {self(), stats},
+stats(Server) ->
+	Server ! {self(), stats},
 	receive
 		Result -> Result
 	end.
-stats(Sock) ->
+stats_(Sock) ->
   case gen_tcp:send(Sock, <<?STATS>>) of
     ok -> case gen_tcp:recv(Sock, 1) of
             {ok, <<?OK>>} -> case gen_tcp:recv(Sock, 4) of
@@ -117,27 +117,24 @@ stats(Sock) ->
 
 wait_for_clients(Socket) ->
 	receive
-		{PId, put, K, V} -> PId ! put(Socket, K, V),
+		{PId, put, K, V} -> PId ! put_(Socket, K, V),
 												wait_for_clients(Socket);
-		{PId, del, K} -> PId ! del(Socket, K),
+		{PId, del, K} -> PId ! del_(Socket, K),
 										 wait_for_clients(Socket);
-		{PId, get, K} -> PId ! get(Socket, K),
+		{PId, get, K} -> PId ! get_(Socket, K),
 										 wait_for_clients(Socket);
-		{PId, take, K} -> PId ! take(Socket, K),
+		{PId, take, K} -> PId ! take_(Socket, K),
 											wait_for_clients(Socket);
-		{PId, stats} -> PId ! stats(Socket),
+		{PId, stats} -> PId ! stats_(Socket),
 										wait_for_clients(Socket);
     close -> gen_tcp:close(Socket);
 		_ -> wait_for_clients(Socket)
 	end.
 
-start_aux() ->
+start() ->
 	case gen_tcp:connect("localhost", 889, [binary, {active, false}, {packet, raw}]) of
-		{ok, Socket} -> register(server, self()),
-										wait_for_clients(Socket);
+		{ok, Socket} -> {ok, spawn(wait_for_clients(Socket))};
 		Error-> Error
 	end.
-start() ->
-	spawn(cli_bin, start_aux, []).	
 
-close() -> server ! close.
+close(Server) -> Server ! close.
