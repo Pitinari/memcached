@@ -275,79 +275,76 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 		close(fd);
 		return false;
 	}
-again:
-	int rc = get_input_commands(text, t);
-	// fprintf(stderr, "'%s' '%s' '%s'\n", text->comm[0], text->comm[1], text->comm[2]);
-	// fprintf(stderr, "'%s' '%s' '%ld'\n", text->buf, text->lastReference, text->cursor);
-	if (rc == 0) return true; // falta leer
-	if (strcmp(text->comm[0], "STATS") == 0 && text->wordsCount == 1) {
-		char* stats = memcached_stats(table);
-		write(fd, "OK ", 3);
-		write(fd, stats, strlen(stats));
-		write(fd, "\n", 1);
-	} else if(text->wordsCount > 1){
-		
-		if (strcmp(text->comm[0], "DEL") == 0 && text->wordsCount == 2) {
 
-			int i = memcached_delete(table, text->comm[1], strlen(text->comm[1]));
-			if (i == 0) {
-				write(fd, "OK\n", 3);
-			} else {
-				write(fd, "ENOTFOUND\n", 10);
-			}
+	int rc;
+	while ((rc = get_input_commands(text, t)) != 0) {
+		if (strcmp(text->comm[0], "STATS") == 0 && text->wordsCount == 1) {
+			char* stats = memcached_stats(table);
+			write(fd, "OK ", 3);
+			write(fd, stats, strlen(stats));
+			write(fd, "\n", 1);
 		} 
-		else if (strcmp(text->comm[0], "GET") == 0 && text->wordsCount == 2) {
-			void *value = NULL;
-			unsigned valueLen;
-			memcached_get(table, text->comm[1], strlen(text->comm[1]), &value, &valueLen);
-			if (value) {
-				write(fd, "OK ", 3);
-				write(fd, value, valueLen);
-				write(fd, "\n", 1);
-				free(value);
+		else if (text->wordsCount > 1) {
+			if (strcmp(text->comm[0], "DEL") == 0 && text->wordsCount == 2) {
+				int i = memcached_delete(table, text->comm[1], strlen(text->comm[1]));
+				if (i == 0) {
+					write(fd, "OK\n", 3);
+				} else {
+					write(fd, "ENOTFOUND\n", 10);
+				}
+			} 
+			else if (strcmp(text->comm[0], "GET") == 0 && text->wordsCount == 2) {
+				void *value = NULL;
+				unsigned valueLen;
+				memcached_get(table, text->comm[1], strlen(text->comm[1]), &value, &valueLen);
+				if (value) {
+					write(fd, "OK ", 3);
+					write(fd, value, valueLen);
+					write(fd, "\n", 1);
+					free(value);
+				} 
+				else {
+					write(fd, "ENOTFOUND\n", 11);
+				}
+			} 
+			else if (strcmp(text->comm[0], "TAKE") == 0 && text->wordsCount == 2) {
+				void *value = NULL;
+				unsigned valueLen;
+				memcached_take(table, text->comm[1], strlen(text->comm[1]), &value, &valueLen);
+				if (value) {
+					write(fd, "OK ", 3);
+					write(fd, value, valueLen);
+					write(fd, "\n", 1);
+					free(value);
+				} else {
+					write(fd, "ENOTFOUND\n", 10);
+				}
+			} 
+			else if (strcmp(text->comm[0], "PUT") == 0 && text->wordsCount == 3) {
+				char *key = custom_malloc(table->ht, strlen(text->comm[1]) + 1);
+				if(key == NULL){
+					return true; // error
+				}
+				strcpy(key, text->comm[1]);
+
+				char *value = custom_malloc(table->ht, strlen(text->comm[2]) + 1);
+				if(value == NULL) {
+					free(key);
+					return true; // error
+				}
+				strcpy(value, text->comm[2]);
+				int i = memcached_put(table, key, strlen(key), value, strlen(value));
+				if (i == 0)
+					write(fd, "OK\n", 3);
 			} 
 			else {
-				write(fd, "ENOTFOUND\n", 11);
+				write(fd, "EINVAL\n", 7);
 			}
-		} 
-		else if (strcmp(text->comm[0], "TAKE") == 0 && text->wordsCount == 2) {
-			void *value = NULL;
-			unsigned valueLen;
-			memcached_take(table, text->comm[1], strlen(text->comm[1]), &value, &valueLen);
-			if (value) {
-				write(fd, "OK ", 3);
-				write(fd, value, valueLen);
-				write(fd, "\n", 1);
-				free(value);
-			} else {
-				write(fd, "ENOTFOUND\n", 10);
-			}
-		} 
-		else if (strcmp(text->comm[0], "PUT") == 0 && text->wordsCount == 3) {
-			char *key = custom_malloc(table->ht, strlen(text->comm[1]) + 1);
-			if(key == NULL){
-				return true; // error
-			}
-			strcpy(key, text->comm[1]);
-
-			char *value = custom_malloc(table->ht, strlen(text->comm[2]) + 1);
-			if(value == NULL) {
-				free(key);
-				return true; // error
-			}
-			strcpy(value, text->comm[2]);
-			int i = memcached_put(table, key, strlen(key), value, strlen(value));
-			if (i == 0)
-				write(fd, "OK\n", 3);
-		} 
-		else {
+		} else {
 			write(fd, "EINVAL\n", 7);
 		}
-	} else {
-		write(fd, "EINVAL\n", 7);
-	}
-	reset_input_buffer(text, t, rc);
-	t -= rc;
-	goto again;
+		reset_input_buffer(text, t, rc);
+		t -= rc;
+	}	
 	return true;
 }
