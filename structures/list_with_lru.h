@@ -34,6 +34,10 @@ typedef void (*EndDeallocateFunctionLRU) (void *forwardRef, void *data, List cur
 typedef void (*OnAddElementLRU) (void *forwardRef);
 /* on delete element of the LRU */
 typedef void (*OnDeleteElementLRU) (void *forwardRef);
+/* take lock of LRU */
+typedef void (*TakeLRULock) (void *forwardRef);
+/* drop lock of LRU */
+typedef void (*DropLRULock) (void *forwardRef);
 
 /* Lista donde se guarda la informacion de los nodos */
 struct _LRU {
@@ -44,6 +48,8 @@ struct _LRU {
 	EndDeallocateFunctionLRU postprocessing;
 	OnAddElementLRU on_add_element;
 	OnDeleteElementLRU on_delete_element;
+	TakeLRULock take_lru_lock;
+	DropLRULock drop_lru_lock;
 	void *forwardRef;
 };
 typedef struct _LRU *LRU;
@@ -58,7 +64,7 @@ List list_create();
 LRU lru_create(AllocationFunction custom_malloc, DestructiveFunction dest,
 								InitDeallocateFunctionLRU preprocessing, EndDeallocateFunctionLRU postprocessing,
 								OnAddElementLRU on_add_element, OnDeleteElementLRU on_delete_element,
-								void *forwardRef);
+								TakeLRULock take_lru_lock, DropLRULock drop_lru_lock, void *forwardRef);
 
 /* Inserta el dato en la lista, si ya pertenece, lo actualiza */
 void list_put(List list, LRU lru, void *data, ComparativeFunction comp);

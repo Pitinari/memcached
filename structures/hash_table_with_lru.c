@@ -15,6 +15,14 @@ void on_delete_element(void *hashTable) {
 	atomic_fetch_sub(&((HashTable)hashTable)->numElems, 1);
 }
 
+void take_lru_lock(void *hashTable){
+	pthread_mutex_lock(((HashTable)hashTable)->lru_lock);
+}
+
+void drop_lru_lock(void *hashTable){
+	pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
+}
+
 // Esta funcion se pasa a la estructura de la LRU para borrar las listas si falla algun malloc
 // Intenta hacer malloc hasta 3 veces o hasta que la lista este vacia
 void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList) {
@@ -25,13 +33,9 @@ void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList) {
 	mem = malloc(size);
 	if(mem == NULL && numberTries < 3 && removed) {
 		fprintf(stderr, "DEALLOCATING... Remaining elements %llu\n", ((HashTable)hashTable)->numElems);
-    	if(currentList == NULL){
-			pthread_mutex_lock(((HashTable)hashTable)->lru_lock);
-		}
+		pthread_mutex_lock(((HashTable)hashTable)->lru_lock);
 		removed = lru_deallocate(((HashTable)hashTable)->lru, currentList);
-		if(currentList == NULL){
-			pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
-		}
+		pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
 		numberTries++;
 		goto again;
 	}
@@ -113,7 +117,9 @@ HashTable create_hashtable(unsigned size) {
 		lru_preprocessing, 
 		lru_postprocessing, 
 		on_add_element, 
-		on_delete_element, 
+		on_delete_element,
+		take_lru_lock,
+		drop_lru_lock, 
 		(void *)table
 	);
 	if (!table->lru) goto error7;
@@ -225,11 +231,9 @@ void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, 
 	unsigned idx = hashedKey % table->size;
 	NodeHT data = nodeht_create(table, key, keyLen, value, valueLen, hashedKey);
 	if(data == NULL) return;
-	pthread_mutex_lock(table->lru_lock);
 	pthread_mutex_lock(table->lists_locks[idx]);
 	list_put(table->lists[idx], table->lru, (void *)data, comparate_keys);
 	pthread_mutex_unlock(table->lists_locks[idx]);
-	pthread_mutex_unlock(table->lru_lock);
 }
 
 void *hashtable_take(HashTable table, void *key, unsigned keyLen) {
@@ -237,10 +241,8 @@ void *hashtable_take(HashTable table, void *key, unsigned keyLen) {
 	unsigned hashedValue = hash_function(key, keyLen);
 	unsigned idx = hashedValue % table->size;
 	struct _NodeHT data = { key, keyLen, NULL, 0, hashedValue };
-	pthread_mutex_lock(table->lru_lock);
 	pthread_mutex_lock(table->lists_locks[idx]);
 	NodeHT returnValue = (NodeHT)list_take(table->lists[idx], table->lru, (void *)&data, comparate_keys);
 	pthread_mutex_unlock(table->lists_locks[idx]);
-	pthread_mutex_unlock(table->lru_lock);
 	return returnValue;
 }

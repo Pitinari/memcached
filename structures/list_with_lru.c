@@ -29,7 +29,9 @@ LRU lru_create(
 	InitDeallocateFunctionLRU preprocessing, 
 	EndDeallocateFunctionLRU postprocessing,
 	OnAddElementLRU on_add_element, 
-	OnDeleteElementLRU on_delete_element, 
+	OnDeleteElementLRU on_delete_element,
+	TakeLRULock take_lru_lock, 
+	DropLRULock drop_lru_lock, 
 	void *forwardRef
 ) {
 	LRU lru = (LRU) malloc(sizeof(struct _LRU));
@@ -49,6 +51,10 @@ LRU lru_create(
 		lru->on_add_element = on_add_element;
 		lru->on_delete_element = on_delete_element;
 
+		// Callbacks para tomar locks, si es que son necesarias
+		lru->take_lru_lock = take_lru_lock;
+		lru->drop_lru_lock = drop_lru_lock;
+
 		// Es un puntero de referencia a la estructura que implemente estas listas con lru
 		// Esto se hizo con la intencion de generalizar la estructura que lo implemente
 		lru->forwardRef = forwardRef;
@@ -57,12 +63,11 @@ LRU lru_create(
 }
 
 void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
-	/* Caso lista vacia */
-	if (list == NULL || lru == NULL) return;
 	if (list->front == NULL) {
 		list->front = nodell_create(data, list, lru);
 		if (list->front == NULL) return; /* No se pudo allocar */
 		list->rear = list->front;
+		lru->take_lru_lock(lru->forwardRef);
 		list->front->nextLRU = lru->front;
 		lru->front = list->front;
 		/* Caso LRU vacia*/
@@ -72,6 +77,7 @@ void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 		else {
 			lru->front->nextLRU->backLRU = lru->front;
 		}
+		lru->drop_lru_lock(lru->forwardRef);
 		lru->on_add_element(lru->forwardRef);
 	} 
 	else {
@@ -84,6 +90,7 @@ void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 		if (temp != NULL) {
 			lru->dest(temp->data);
 			temp->data = data;
+			lru->take_lru_lock(lru->forwardRef);
 			if (temp != lru->front) {
 				temp->backLRU->nextLRU = temp->nextLRU;
 				if (temp->nextLRU) {
@@ -93,6 +100,7 @@ void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 				lru->front->backLRU = temp;
 				lru->front = temp;
 			}
+			lru->drop_lru_lock(lru->forwardRef);
 		}
 		/* Si no fue encontrado se guarda en el final de la lista*/
 		else {
@@ -101,16 +109,17 @@ void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 			if (list->rear == NULL) return; /* No se pudo allocar */
 			list->rear->backList = temp;
 			temp->nextList = list->rear;
+			lru->take_lru_lock(lru->forwardRef);
 			list->rear->nextLRU = lru->front;
 			lru->front = list->rear;
 			lru->front->nextLRU->backLRU = lru->front;
+			lru->drop_lru_lock(lru->forwardRef);
 			lru->on_add_element(lru->forwardRef);
 		}
 	}
 }
 
 void* list_take(List list, LRU lru, void *data, ComparativeFunction comp) {
-	if (list == NULL || lru == NULL) return NULL;
 	if (list->front != NULL) {
 		/* Buscamos el nodo deseado*/
 		NodeLL temp = list->front;
@@ -126,6 +135,8 @@ void* list_take(List list, LRU lru, void *data, ComparativeFunction comp) {
 			if (temp->backList) {
 				temp->backList->nextList = temp->nextList;
 			}
+			lru->take_lru_lock(lru->forwardRef);
+
 			if (temp->nextLRU) {
 				temp->nextLRU->backLRU = temp->backLRU;
 			}
@@ -139,6 +150,8 @@ void* list_take(List list, LRU lru, void *data, ComparativeFunction comp) {
 			if (temp == lru->rear) {
 				lru->rear = temp->backLRU;
 			}
+			lru->drop_lru_lock(lru->forwardRef);
+
 			if (temp == list->front) {
 				list->front = temp->nextList;
 			}
@@ -171,7 +184,6 @@ void* list_get(List list, void *data, ComparativeFunction comp) {
 
 // Funcion para borrar elementos desde la LRU
 bool lru_deallocate(LRU lru, List currentList) {
-	if (lru == NULL) return false;
 	if (lru->rear != NULL) {
 		int alreadyDeallocated = 0;
 		// Iniciamos borrando desde el ultimo nodo agregado
@@ -227,7 +239,6 @@ void list_destroy(List list) {
 }
 
 void lru_destroy(LRU lru) {
-	if (lru == NULL) return;
 	NodeLL current = lru->front;
 	while (lru->front) {
 		lru->dest(current->data);
