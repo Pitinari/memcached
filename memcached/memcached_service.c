@@ -22,10 +22,9 @@ Memcached memcached_create(unsigned size){
 	return NULL;
 }
 
-int memcached_put(Memcached mc, void* key, unsigned keyLen, void *value, unsigned valueLen) {
+bool memcached_put(Memcached mc, void* key, unsigned keyLen, void *value, unsigned valueLen) {
 	atomic_fetch_add(&mc->puts, 1);
-	hashtable_insert(mc->ht, key, keyLen, value, valueLen);
-	return 0;
+	return hashtable_insert(mc->ht, key, keyLen, value, valueLen);
 }
 
 void memcached_get(Memcached mc, void *key, unsigned keyLen, void **value, unsigned *valueLen) {

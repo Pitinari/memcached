@@ -12,8 +12,8 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/select.h>
-#include "memcached_controller.h"
-#include "memcached_service.h"
+#include "./memcached/memcached_controller.h"
+#include "./memcached/memcached_service.h"
 #include <pthread.h>
 #include <sys/resource.h>
 #include <fcntl.h>

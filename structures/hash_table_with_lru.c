@@ -226,15 +226,16 @@ void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value,
 	return;
 }
 
-void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, unsigned valueLen) {
-	if (table == NULL) return;
+bool hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, unsigned valueLen) {
+	if (table == NULL) return false;
 	unsigned hashedKey = hash_function(key, keyLen);
 	unsigned idx = hashedKey % table->size;
 	NodeHT data = nodeht_create(table, key, keyLen, value, valueLen, hashedKey);
-	if(data == NULL) return;
+	if(data == NULL) return false;
 	pthread_mutex_lock(table->lists_locks[idx]);
-	list_put(table->lists[idx], table->lru, (void *)data, comparate_keys);
+	bool result = list_put(table->lists[idx], table->lru, (void *)data, comparate_keys);
 	pthread_mutex_unlock(table->lists_locks[idx]);
+	return result;
 }
 
 void *hashtable_take(HashTable table, void *key, unsigned keyLen) {

@@ -67,7 +67,7 @@ LRU lru_create(AllocationFunction custom_malloc, DestructiveFunction dest,
 								TakeLRULock take_lru_lock, DropLRULock drop_lru_lock, void *forwardRef);
 
 /* Inserta el dato en la lista, si ya pertenece, lo actualiza */
-void list_put(List list, LRU lru, void *data, ComparativeFunction comp);
+bool list_put(List list, LRU lru, void *data, ComparativeFunction comp);
 
 /* Retorna el dato del nodo cuya comparacion devuelve true con data y lo
 elimina de la lista y la LRU */

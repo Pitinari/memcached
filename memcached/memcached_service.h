@@ -1,7 +1,7 @@
 #ifndef __MEMCACHED_H__
 #define __MEMCACHED_H__
 
-#include "./structures/hash_table_with_lru.h"
+#include "../structures/hash_table_with_lru.h"
 
 struct _Memcached {
     HashTable ht;
@@ -15,7 +15,7 @@ typedef struct _Memcached *Memcached;
 
 Memcached memcached_create(unsigned size_hashtable);
 
-int memcached_put(Memcached mc, void* key, unsigned keyLen, void *value, unsigned valueLen);
+bool memcached_put(Memcached mc, void* key, unsigned keyLen, void *value, unsigned valueLen);
 
 void memcached_get(Memcached mc, void *key, unsigned keyLen, void **value, unsigned *valueLen);
 

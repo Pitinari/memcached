@@ -29,6 +29,7 @@ enum responses {
 	EBINARY = 113,
 	EBIG = 114,
 	EUNK = 115,
+	EOOM = 116,
 };
 
 enum bin_state_current_reading {

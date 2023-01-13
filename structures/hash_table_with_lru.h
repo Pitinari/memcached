@@ -42,7 +42,7 @@ unsigned hashtable_nelems(HashTable table);
 void hashtable_destroy(HashTable table);
 
 /* Inserta un dato en la tabla, o lo reemplaza si ya se encontraba */
-void hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, unsigned valueLen);
+bool hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, unsigned valueLen);
 
 /*Retorna el dato de la tabla que coincida con el dato dado, o NULL si el dato
 buscado no se encuentra en la tabla */

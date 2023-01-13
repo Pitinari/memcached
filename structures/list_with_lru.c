@@ -92,10 +92,10 @@ void remove_node_from_lru(NodeLL node, LRU lru){
 	}
 }
 
-void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
+bool list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 	if (list->front == NULL) {
 		list->front = nodell_create(data, list, lru);
-		if (list->front == NULL) return; /* No se pudo allocar */
+		if (list->front == NULL) return false; /* No se pudo allocar */
 		list->rear = list->front;
 		lru->take_lru_lock(lru->forwardRef);
 		list->front->nextLRU = lru->front;
@@ -136,7 +136,7 @@ void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 		else {
 			temp = list->rear;
 			list->rear = nodell_create(data, list, lru);
-			if (list->rear == NULL) return; /* No se pudo allocar */
+			if (list->rear == NULL) return false; /* No se pudo allocar */
 			list->rear->backList = temp;
 			temp->nextList = list->rear;
 			lru->take_lru_lock(lru->forwardRef);
@@ -147,6 +147,7 @@ void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 			lru->on_add_element(lru->forwardRef);
 		}
 	}
+	return true;
 }
 
 void* list_take(List list, LRU lru, void *data, ComparativeFunction comp) {

@@ -131,9 +131,12 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 			if (t < 0) return false;
 			else if(t == 0) return true;
 		}
-		int i = memcached_put(table, bin->key, bin->keyLen, bin->value, bin->valueLen);
-		if (i == 0) {
+		bool result = memcached_put(table, bin->key, bin->keyLen, bin->value, bin->valueLen);
+		if (result) {
 			int code = OK;
+			write(fd, &code, 1);
+		} else {
+			int code = EOOM;
 			write(fd, &code, 1);
 		}
 		bin->cursor = 0;
@@ -343,9 +346,11 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 					return true; // error
 				}
 				strcpy(value, text->comm[2]);
-				int i = memcached_put(table, key, strlen(key), value, strlen(value));
-				if (i == 0)
+				bool result = memcached_put(table, key, strlen(key), value, strlen(value));
+				if (result)
 					write(fd, "OK\n", 3);
+				else
+					write(fd, "EOOM\n", 5);
 			} 
 			else {
 				write(fd, "EINVAL\n", 7);
