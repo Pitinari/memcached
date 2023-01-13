@@ -32,9 +32,10 @@ void *custom_malloc_wrapper(void *hashTable, size_t size, List currentList) {
 	again:
 	mem = malloc(size);
 	if(mem == NULL && numberTries < 3 && removed) {
-		fprintf(stderr, "DEALLOCATING... Remaining elements %llu\n", ((HashTable)hashTable)->numElems);
 		pthread_mutex_lock(((HashTable)hashTable)->lru_lock);
+		fprintf(stderr, "DEALLOCATING...");
 		removed = lru_deallocate(((HashTable)hashTable)->lru, currentList);
+		fprintf(stderr, "Remaining elements %llu\n", ((HashTable)hashTable)->numElems);
 		pthread_mutex_unlock(((HashTable)hashTable)->lru_lock);
 		numberTries++;
 		goto again;

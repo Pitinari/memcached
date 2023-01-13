@@ -62,6 +62,36 @@ LRU lru_create(
 	return lru;
 }
 
+void remove_node_from_list(NodeLL node, List list){
+	if (node->nextList) {
+		node->nextList->backList = node->backList;
+	}
+	if (node->backList) {
+		node->backList->nextList = node->nextList;
+	}
+	if (node == list->front) {
+		list->front = node->nextList;
+	}
+	if (node == list->rear) {
+		list->rear = node->backList;
+	}
+}
+
+void remove_node_from_lru(NodeLL node, LRU lru){
+	if (node->nextLRU) {
+		node->nextLRU->backLRU = node->backLRU;
+	}
+	if (node->backLRU) {
+		node->backLRU->nextLRU = node->nextLRU;
+	}
+	if (node == lru->front) {
+		lru->front = node->nextLRU;
+	}
+	if (node == lru->rear) {
+		lru->rear = node->backLRU;
+	}
+}
+
 void list_put(List list, LRU lru, void *data, ComparativeFunction comp) {
 	if (list->front == NULL) {
 		list->front = nodell_create(data, list, lru);
@@ -129,35 +159,11 @@ void* list_take(List list, LRU lru, void *data, ComparativeFunction comp) {
 		if (temp != NULL) {
 			/* Acomodamos los punteros de los vecinos */
 			void *returnData = temp->data;
-			if (temp->nextList) {
-				temp->nextList->backList = temp->backList;
-			}
-			if (temp->backList) {
-				temp->backList->nextList = temp->nextList;
-			}
+			remove_node_from_list(temp, list);
 			lru->take_lru_lock(lru->forwardRef);
-
-			if (temp->nextLRU) {
-				temp->nextLRU->backLRU = temp->backLRU;
-			}
-			if (temp->backLRU) {
-				temp->backLRU->nextLRU = temp->nextLRU;
-			}
-			/* Acomodamos los punteros de las listas */
-			if (temp == lru->front) {
-				lru->front = temp->nextLRU;
-			}
-			if (temp == lru->rear) {
-				lru->rear = temp->backLRU;
-			}
+			remove_node_from_lru(temp, lru);
 			lru->drop_lru_lock(lru->forwardRef);
 
-			if (temp == list->front) {
-				list->front = temp->nextList;
-			}
-			if (temp == list->rear) {
-				list->rear = temp->backList;
-			}
 			/* Eliminamos el nodo y devolvemos el dato guardado */
 			lru->on_delete_element(lru->forwardRef);
 			free(temp);
@@ -184,54 +190,39 @@ void* list_get(List list, void *data, ComparativeFunction comp) {
 
 // Funcion para borrar elementos desde la LRU
 bool lru_deallocate(LRU lru, List currentList) {
-	if (lru->rear != NULL) {
-		int alreadyDeallocated = 0;
-		// Iniciamos borrando desde el ultimo nodo agregado
-		NodeLL temp = lru->rear;
-		List currentListDeallocation = NULL;
-		// Hasta borrar 10 o que las listas esten vacias
-		while(temp != NULL && alreadyDeallocated < 10) {
-			// preprocessing es para hacer los procedimientos previos a empezar a borrar un nodo
-			// currentList es para un caso borde de si deallocate se llamo mientras se inserta en la lista
-
-			currentListDeallocation = lru->preprocessing(lru->forwardRef, temp->data, currentList);
-			// Si el preprocessing devuelve NULL, implica que hubo un error con el nodo y se saltea
-			if(currentListDeallocation){ // Si devolvio la lista
-				// Acomodamos la LRU
-				lru->rear = temp->backLRU;
-
-				if(temp->nextList){
-					temp->nextList->backList = temp->backList;
-				}
-				if(temp->backList){
-					temp->backList->nextList = temp->nextList;
-				}
-				if(currentListDeallocation->front == temp){
-					currentListDeallocation->front = temp->nextList;
-				}
-				if(currentListDeallocation->rear == temp){
-					currentListDeallocation->rear = temp->backList;
-				}
-
-				// Luego, de forma similar a preprocessing, se llama a postprocessing
-				lru->postprocessing(lru->forwardRef, temp->data, currentList);
-				// Finalmente aplicamos la callback de borrar un elementos de una lista
-				lru->on_delete_element(lru->forwardRef);
-				// Destruimos el nodo
-				lru->dest(temp->data);
-				free(temp);
-			}
-			alreadyDeallocated++;
-			temp = lru->rear;
+	if (lru->rear == NULL) return false;
+	int alreadyDeallocated = 0;
+	// Iniciamos borrando desde el ultimo nodo agregado
+	NodeLL temp = lru->rear;
+	NodeLL aux;
+	List currentListDeallocation = NULL;
+	// Hasta borrar 10 o que las listas esten vacias
+	while(temp != NULL && alreadyDeallocated < 10) {
+		// preprocessing es para hacer los procedimientos previos a empezar a borrar un nodo
+		// currentList es para un caso borde de si deallocate se llamo mientras se inserta en la lista
+		currentListDeallocation = lru->preprocessing(lru->forwardRef, temp->data, currentList);
+		// Si el preprocessing devuelve NULL, implica que hubo un error con el nodo y se saltea
+		alreadyDeallocated++;
+		if(!currentListDeallocation){
+			temp = temp->backLRU;
+			continue;
 		}
-		if (temp != NULL) {
-			temp->nextLRU = NULL;
-		}
-		return true;
+			
+		// Si devolvio la lista
+		// Acomodamos la LRU
+		remove_node_from_list(temp, currentListDeallocation);
+		remove_node_from_lru(temp, lru);
+		// Luego, de forma similar a preprocessing, se llama a postprocessing
+		lru->postprocessing(lru->forwardRef, temp->data, currentList);
+		// Finalmente aplicamos la callback de borrar un elementos de una lista
+		lru->on_delete_element(lru->forwardRef);
+		aux = temp->backLRU;
+		// Destruimos el nodo
+		lru->dest(temp->data);
+		free(temp);
+		temp = aux;
 	} 
-	else {
-		return false;
-	}
+	return true;
 }
 
 void list_destroy(List list) {
