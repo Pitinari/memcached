@@ -121,11 +121,16 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 
 // Handler de una conexion a cliente en modo binario
 bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
-	int t;
-	start:
+	int t = binary_read_handler(fd, bin, table);
+	if (t < 0) return false;
+	else if(t == 0) return true;
 	
 	if (bin->command == PUT) {
-		if(bin->reading < COMPLETED) goto read;
+		while (bin->reading < COMPLETED) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		int i = memcached_put(table, bin->key, bin->keyLen, bin->value, bin->valueLen);
 		if (i == 0) {
 			int code = OK;
@@ -136,7 +141,11 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == DEL)  {
-		if(bin->reading < VALUE_SIZE) goto read;
+		while (bin->reading < VALUE_SIZE) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		int i = memcached_delete(table, bin->key, bin->keyLen);
 		if (i == 0) {
 			int code = OK;
@@ -151,7 +160,11 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == GET) {
-		if(bin->reading < VALUE_SIZE) goto read;
+		while (bin->reading < VALUE_SIZE) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		void *value = NULL;
 		unsigned valueLen;
 		memcached_get(table, bin->key, bin->keyLen, &value, &valueLen);
@@ -172,7 +185,11 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == TAKE) {
-		if(bin->reading < VALUE_SIZE) goto read;
+		while (bin->reading < VALUE_SIZE) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		void *value = NULL;
 		unsigned valueLen;
 		memcached_take(table, bin->key, bin->keyLen, &value, &valueLen);
@@ -208,14 +225,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->cursor = 0;
 		bin->reading = OPERATOR;
 		bin->command = EMPTY;
-	} else{
-		read:
-		t = binary_read_handler(fd, bin, table);
-
-		if(t < 0) return false;
-		else if(t == 0) return true;
-		else goto start;
-	}
+	} 
 	return true;
 }
 
