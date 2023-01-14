@@ -12,7 +12,7 @@ typedef void *(*AlloccateFunctionHash) (size_t size);
 /* Estructura principal que representa la tabla hash */
 struct _HashTable {
   List *lists;
-  pthread_mutex_t **lists_locks;
+  pthread_mutex_t *lists_locks;
   LRU lru;
   pthread_mutex_t *lru_lock;
   unsigned size;

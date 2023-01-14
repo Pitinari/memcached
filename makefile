@@ -7,10 +7,10 @@ U = utils/
 M = memcached/
 
 start: compile
-	sudo ./server
+	./server
 
 debug: compile
-	sudo valgrind ./server
+	valgrind ./server --tool=helgrind
 
 compile: server.o memcached_controller.o memcached_service.o hash_table_with_lru.o hash.o list_with_lru.o
 	gcc $(FLAGS) server.o memcached_controller.o memcached_service.o hash_table_with_lru.o hash.o list_with_lru.o -o server

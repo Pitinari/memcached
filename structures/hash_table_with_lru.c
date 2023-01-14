@@ -55,7 +55,7 @@ List lru_preprocessing(void *hashTable, void *data, List currentList) {
 	int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
 	List list = ((HashTable)hashTable)->lists[idx];
 	if(list != currentList) {
-		if(pthread_mutex_trylock(((HashTable)hashTable)->lists_locks[idx]) < 0){			
+		if(pthread_mutex_trylock(&((HashTable)hashTable)->lists_locks[idx]) < 0){			
 			return NULL;
 		}
 	}
@@ -67,7 +67,7 @@ void lru_postprocessing(void *hashTable, void *data, List currentList) {
 	int idx = ((NodeHT)data)->hashedKey % ((HashTable)hashTable)->size;
 	List list = ((HashTable)hashTable)->lists[idx];
 	if(list != currentList) {
-		pthread_mutex_unlock(((HashTable)hashTable)->lists_locks[idx]);
+		pthread_mutex_unlock(&((HashTable)hashTable)->lists_locks[idx]);
 	}
 }
 
@@ -96,18 +96,14 @@ HashTable create_hashtable(unsigned size) {
 		if(!table->lists[i]) { i--; goto error3; }
 		i++;
 	}
-	table->lists_locks = malloc(sizeof(pthread_mutex_t *) * size);
+	table->lists_locks = malloc(sizeof(table->lists_locks[0]) * size);
 	if (!table->lists_locks) goto error4;
 
 	table->lru_lock = malloc(sizeof(pthread_mutex_t));
 	if (!table->lru_lock) goto error5;
 
 	for (; j < size; j++) {
-		if ((table->lists_locks[j] = malloc(sizeof(pthread_mutex_t))) == NULL) {
-			j--;
-			goto error6;
-		}
-		pthread_mutex_init(table->lists_locks[j], NULL);
+		pthread_mutex_init(&table->lists_locks[j], NULL);
 	}
 
 	pthread_mutex_init(table->lru_lock, NULL);
@@ -135,11 +131,6 @@ HashTable create_hashtable(unsigned size) {
 	free(table->lru_lock);
 	j--;
 
-	error6:
-	for (; j >= 0; j--) {
-		free(table->lists_locks[i]);
-	}
-
 	error5:
 	free(table->lists_locks);
 
@@ -157,10 +148,7 @@ HashTable create_hashtable(unsigned size) {
 }
 
 /* Funcion para comparar las claves */
-bool comparate_keys(void *data1, void *data2) {
-	if (data1 == NULL || data2 == NULL)	{
-		return false;
-	}
+bool compare_keys(void *data1, void *data2) {
 	NodeHT a = (NodeHT)data1, b = (NodeHT)data2;
 	if (a->keyLen == b->keyLen &&
 			a->hashedKey == b->hashedKey) {
@@ -208,12 +196,12 @@ void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value,
 	unsigned hashedKey = hash_function(key, keyLen);
 	unsigned idx = hashedKey % table->size;
 	struct _NodeHT data = { key, keyLen, NULL, 0, hashedKey };
-	pthread_mutex_lock(table->lists_locks[idx]);
-	NodeHT returnValue = (NodeHT)list_get(table->lists[idx], (void *)&data, comparate_keys);
+	pthread_mutex_lock(&table->lists_locks[idx]);
+	NodeHT returnValue = (NodeHT)list_get(table->lists[idx], (void *)&data, compare_keys);
 	if(returnValue){
 		*value = custom_malloc(table, returnValue->valueLen);
 		if(*value == NULL){
-			pthread_mutex_unlock(table->lists_locks[idx]);
+			pthread_mutex_unlock(&table->lists_locks[idx]);
 			return;
 		}
 		memcpy(*value, returnValue->value, returnValue->valueLen);
@@ -222,7 +210,7 @@ void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value,
 		*value = NULL;
 		*valueLen = 0;
 	}
-	pthread_mutex_unlock(table->lists_locks[idx]);
+	pthread_mutex_unlock(&table->lists_locks[idx]);
 	return;
 }
 
@@ -232,9 +220,9 @@ bool hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, 
 	unsigned idx = hashedKey % table->size;
 	NodeHT data = nodeht_create(table, key, keyLen, value, valueLen, hashedKey);
 	if(data == NULL) return false;
-	pthread_mutex_lock(table->lists_locks[idx]);
-	bool result = list_put(table->lists[idx], table->lru, (void *)data, comparate_keys);
-	pthread_mutex_unlock(table->lists_locks[idx]);
+	pthread_mutex_lock(&table->lists_locks[idx]);
+	bool result = list_put(table->lists[idx], table->lru, (void *)data, compare_keys);
+	pthread_mutex_unlock(&table->lists_locks[idx]);
 	return result;
 }
 
@@ -243,8 +231,8 @@ void *hashtable_take(HashTable table, void *key, unsigned keyLen) {
 	unsigned hashedValue = hash_function(key, keyLen);
 	unsigned idx = hashedValue % table->size;
 	struct _NodeHT data = { key, keyLen, NULL, 0, hashedValue };
-	pthread_mutex_lock(table->lists_locks[idx]);
-	NodeHT returnValue = (NodeHT)list_take(table->lists[idx], table->lru, (void *)&data, comparate_keys);
-	pthread_mutex_unlock(table->lists_locks[idx]);
+	pthread_mutex_lock(&table->lists_locks[idx]);
+	NodeHT returnValue = (NodeHT)list_take(table->lists[idx], table->lru, (void *)&data, compare_keys);
+	pthread_mutex_unlock(&table->lists_locks[idx]);
 	return returnValue;
 }

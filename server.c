@@ -17,10 +17,10 @@
 #include <pthread.h>
 #include <sys/resource.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #define DATA_LIMIT 1000000000 // con 1190000 bytes se ve bien el uso del deallocate con mas de 500 conexiones
 #define NUM_OF_NODES 10000
-#define N_THREADS 6
 
 typedef struct sockaddr_in sin;
 typedef struct sockaddr    sad;
@@ -180,6 +180,7 @@ int create_sock(int port) {
 }
 
 int main() {
+	fprintf(stderr, "Server starting...\n");
 
 	struct rlimit *r = malloc(sizeof(struct rlimit));
 	if(r == NULL) die("Error allocation limit memory structure");
@@ -219,16 +220,22 @@ int main() {
 		die("error on remove privileges");
 	}
 
-	pthread_t hand[N_THREADS-1];
+	// Ignora la señal SIGPIPE para que el programa no muera
+	signal(SIGPIPE, SIG_IGN);
+
+	long nThreads = sysconf(_SC_NPROCESSORS_ONLN);
+	pthread_t hand[nThreads-1];
 	struct _args args;
 	args.epfd = epfd;
 	args.textSock = sock1;
 	args.binSock = sock2;
 	args.mc = mc;
 	
-	for (size_t i = 0; i < N_THREADS-1; i++) {
+	for (size_t i = 0; i < nThreads-1; i++) {
 		pthread_create(&hand[i], NULL, handle_connections, (void *)&args);
 	}
+	fprintf(stderr, "Finished starting\n");
+
 	handle_connections((void *)&args);
 
 	return 0;
