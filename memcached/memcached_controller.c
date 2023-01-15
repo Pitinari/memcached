@@ -98,7 +98,7 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 	}	
 	/* EOF */
 	if (t == 0) {
-		close(fd);
+		return 0;
 	}
 	/* No hay más nada por ahora */
 	else if (t < 0) {
@@ -126,11 +126,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	else if(t == 0) return true;
 	
 	if (bin->command == PUT) {
-		while (bin->reading < COMPLETED) {
-			t = binary_read_handler(fd, bin, table);
-			if (t < 0) return false;
-			else if(t == 0) return true;
-		}
+		if (bin->reading < COMPLETED) return true;
 		bool result = memcached_put(table, bin->key, bin->keyLen, bin->value, bin->valueLen);
 		if (result) {
 			int code = OK;
@@ -144,11 +140,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == DEL)  {
-		while (bin->reading < VALUE_SIZE) {
-			t = binary_read_handler(fd, bin, table);
-			if (t < 0) return false;
-			else if(t == 0) return true;
-		}
+		if (bin->reading < VALUE_SIZE) return true;
 		int i = memcached_delete(table, bin->key, bin->keyLen);
 		if (i == 0) {
 			int code = OK;
@@ -163,11 +155,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == GET) {
-		while (bin->reading < VALUE_SIZE) {
-			t = binary_read_handler(fd, bin, table);
-			if (t < 0) return false;
-			else if(t == 0) return true;
-		}
+		if (bin->reading < VALUE_SIZE) return true;
 		void *value = NULL;
 		unsigned valueLen;
 		memcached_get(table, bin->key, bin->keyLen, &value, &valueLen);
@@ -188,11 +176,7 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == TAKE) {
-		while (bin->reading < VALUE_SIZE) {
-			t = binary_read_handler(fd, bin, table);
-			if (t < 0) return false;
-			else if(t == 0) return true;
-		}
+		if (bin->reading < VALUE_SIZE) return true;
 		void *value = NULL;
 		unsigned valueLen;
 		memcached_take(table, bin->key, bin->keyLen, &value, &valueLen);
