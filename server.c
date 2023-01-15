@@ -21,6 +21,8 @@
 
 #define DATA_LIMIT 1000000000 // con 1190000 bytes se ve bien el uso del deallocate con mas de 500 conexiones
 #define NUM_OF_NODES 10000
+#define GROUP_ID 1000
+#define USER_ID 1000
 
 typedef struct sockaddr_in sin;
 typedef struct sockaddr    sad;
@@ -182,6 +184,14 @@ int create_sock(int port) {
 int main() {
 	fprintf(stderr, "Server starting...\n");
 
+
+	gid_t gid = getgid();
+	uid_t uid = getuid();
+
+	if (uid != 0) {
+		die("error on get privileges");
+	}
+
 	struct rlimit *r = malloc(sizeof(struct rlimit));
 	if(r == NULL) die("Error allocation limit memory structure");
 	r->rlim_cur = DATA_LIMIT;
@@ -190,12 +200,7 @@ int main() {
 		die("error limiting data");
 	}
 
-	gid_t gid = getgid();
-	uid_t uid = getuid();
 
-	if (uid != 0) {
-		die("administrator permissions required");
-	}
 	int sock1, sock2;
 
 	sock1 = create_sock(888);
@@ -216,7 +221,7 @@ int main() {
 	if(register_fd(epfd, sock2, true, mc) < 0) 
 		die("error on register bin socket");
 
-	if (setgid(getgid()) < 0 || setuid(getuid()) < 0) {
+	if (setgid(GROUP_ID) < 0 || setuid(USER_ID) < 0) {
 		die("error on remove privileges");
 	}
 
