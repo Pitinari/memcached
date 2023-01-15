@@ -46,7 +46,6 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 		bin->reading = KEY_SIZE;
 		break;
 	case KEY_SIZE:
-
 		t = read(fd, bin->sizeBuf + bin->cursor, 4 - bin->cursor);
 		if(t <= 0) break;
 		bin->cursor += t;
@@ -98,7 +97,7 @@ int binary_read_handler(int fd, struct bin_state *bin, Memcached table){
 	}	
 	/* EOF */
 	if (t == 0) {
-		return 0;
+		close(fd);
 	}
 	/* No hay más nada por ahora */
 	else if (t < 0) {
@@ -126,7 +125,11 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 	else if(t == 0) return true;
 	
 	if (bin->command == PUT) {
-		if (bin->reading < COMPLETED) return true;
+		while (bin->reading < COMPLETED) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		bool result = memcached_put(table, bin->key, bin->keyLen, bin->value, bin->valueLen);
 		if (result) {
 			int code = OK;
@@ -140,7 +143,11 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == DEL)  {
-		if (bin->reading < VALUE_SIZE) return true;
+		while (bin->reading < VALUE_SIZE) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		int i = memcached_delete(table, bin->key, bin->keyLen);
 		if (i == 0) {
 			int code = OK;
@@ -155,7 +162,11 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == GET) {
-		if (bin->reading < VALUE_SIZE) return true;
+		while (bin->reading < VALUE_SIZE) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		void *value = NULL;
 		unsigned valueLen;
 		memcached_get(table, bin->key, bin->keyLen, &value, &valueLen);
@@ -176,7 +187,11 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == TAKE) {
-		if (bin->reading < VALUE_SIZE) return true;
+		while (bin->reading < VALUE_SIZE) {
+			t = binary_read_handler(fd, bin, table);
+			if (t < 0) return false;
+			else if(t == 0) return true;
+		}
 		void *value = NULL;
 		unsigned valueLen;
 		memcached_take(table, bin->key, bin->keyLen, &value, &valueLen);
