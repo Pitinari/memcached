@@ -1,0 +1,387 @@
+Entrada/Salida
+==============
+
+Al parser de texto le falta bastante para andar confiablemente.
+
+- En la implementación de GET modo texto, esto está mal.
+
+	if (value) {
+		write(fd, "OK\n", 4);
+		write(fd, value, valueLen);
+		free(value);
+	} 
+
+Primero que "OK\n" son 3 bytes ('\n' es un sólo char, el mismo error
+está en otros lados). Con esto se están mandando caracteros nulos por
+el modo texto, que no debería ocurrir. Segundo que falta un espacio, y
+tercero que el '\n' va DESPUÉS del valor. Y falta el chequeo de si es
+binario. Lo mismo para otros.
+			
+Correccion:
+if (value) {
+	write(fd, "OK ", 3);
+	write(fd, value, valueLen);
+	write(fd, "\n", 1);
+	free(value);
+} 				
+
+- En el modo binario también se está mandando un caracter nulo sin razón.
+Hay que borrar los +1.
+
+	else if (bin->command == STATS) {
+		char* line = memcached_stats(table);
+		if(line != NULL){
+			char code = OK;
+			write(fd, &code, 1);
+			send_length(fd, strlen(line)+1);
+			write(fd, line, strlen(line)+1);
+			free(line);
+						
+Correccion:
+if(line != NULL){
+	char code = OK;
+	write(fd, &code, 1);
+	send_length(fd, strlen(line));
+	write(fd, line, strlen(line));
+	free(line);
+}
+
+- En este fragmento, se detecta el éxito de `memcached_take` revisando
+si `value` es `NULL`, pero `value` no fue inicializada... Hay que
+inicializarla (mejor) o garantizar que `memcached_take` la escribe
+siempre. Ídem caso GET.
+
+		if(bin->reading < VALUE_SIZE) goto read;
+		void *value;
+		unsigned valueLen;
+		memcached_take(table, bin->key, bin->keyLen, &value, &valueLen);
+		if (value != NULL) {
+					
+Correccion:
+void *value = NULL;
+unsigned valueLen;
+memcached_get(table, bin->key, bin->keyLen, &value, &valueLen);
+
+- Este patrón es un quilombo:
+
+	else if (bin->command == TAKE) {
+		if(bin->reading < VALUE_SIZE) goto read;
+		[..]
+	} 
+	} else{
+		read:
+		t = binary_read_handler(fd, bin, table);
+
+		if(t < 0) return false;
+		else if(t == 0) return true;
+		else goto start;
+	}
+
+Saltar de un bloque a otro es medio una locura: es complicado seguir la
+lógica y además, si cualquier bloque declara variables locales, de
+comportamiento indefinido (qué pasa con la pila en el salto?: nada).
+			
+Correccion:
+int t = binary_read_handler(fd, bin, table);
+if (t < 0) return false;
+else if(t == 0) return true;
+if (bin->command == PUT) {
+	// Si no esta completo el comando, se retorna true y se espera la llegada de mas bytes
+	if (bin->reading < COMPLETED) return true;
+
+
+También el de `binary_read_handler` que hace un goto y "lleva" la
+variable `t` con él. Esto es muy difícil de revisar y mantener. Vean
+los ejemplos que usamos en clase: ninguno lleva estado entre los saltos,
+ni salta entre bloques. Hay POCOS usos aceptables de goto, estos no lo
+son.
+			
+Corregido:
+case OPERATOR:
+	t = read(fd, &bin->command, 1);
+	if(t <= 0) break;
+	[..]
+// Manejo de casos sobre t
+if (t > 0) {
+	return 1;
+}	
+
+- Esto es medio trucho: se debería ignorar ese comando pero no resetear
+todo el buffer. Si tengo un comando inválido no debería matar a los
+siguientes.
+
+	if(wordsCount < 0){
+		// Si el input esta malformado reseteamos todo el input
+		write(fd, "EINVAL\n", 7);
+		text->cursor = 0;
+					
+Correccion:
+Ahora se copia desde el \n hasta donde se leyo al inicio del buffer y se
+busca el siguiente \n para tomar el siguiente comando, si no se encuentra el
+\n se retorna true y se esperan mas caracteres
+
+- El parser no funciona bien para tomar cosas parciales. Si mando esto
+por netcat, forzando a que se escriba en el socket con Control-D, el
+server segfaultea.
+
+	$ nc localhost 8888
+	PUT a<C-d>
+
+Pasa porque se llama a get_input_commands con algo que no tiene un \n.
+			
+Correccion:
+Ahora se lee hasta encontrar un \n o hasta el final de la entrada, si no se
+encuentra el \n se guarda el estado y se esperan mas caracteres
+
+- Por otro lado si llegan dos comandos juntos, tampoco anda el parser
+de modo texto. La func `text_handler` maneja uno solo y luego retorna,
+posiblemente dejando texto, incluso un comando entero, en el buffer. Y
+posiblemente no sea despertada hasta otro evento. Probar con:
+
+	$ echo -ne 'GET a\nGET b\n' | nc localhost 888
+
+eso tendría que contestar ambos mensajes.
+
+Correccion:
+Ahora ejecutan los comandos hasta que se tome un resultado parcial (o que se
+termine la entrada)
+Estructuras
+===========
+
+- Creo que se compraron un boleto al callback hell, pero parece
+funcionar.
+
+- hashtable_search / memcached_get copia el valor, subóptimo pero OK.
+
+- La política no es LRU: es FIFO. Está OK pero aclarar.
+
+- Toda operación, salvo los GET, toma PRIMERO el lock de la FIFO y
+luego el de las filas, con lo cual están totalmente serializadas. Por
+qué? Como hablamos en la defensa deberían poder ajustar bastante el
+tomado del lock FIFO.
+
+Correccion: Ahora el todas la operaciones (exceptuando el deallocate) toman
+el lock de la lista y luego toman el lock de la FIFO si es necesario.
+
+- En hashtable_insert:
+
+	if(data == NULL) return;
+
+esto debería señalizar el error EOOM o similar, así como está va a terminar
+devolviendo OK.
+
+Correccion: Ahora se maneja el caso de que no se pudo allocar memoria para insertar el valor
+
+- Estas cosas son un antipatrón, ahora hay que pensar todo el esquema
+de concurrencia 2 veces, con `currentList == NULL` y `!= NULL`, y lo
+mismo para `lru_deallocate`, pre y postprocessing, etc. Es mucho mejor
+que el estado de los locks y etc sea _estáticamente_ claro.
+
+	if (currentList == NULL) {
+		pthread_mutex_lock(((HashTable) hashTable)->lru_lock);
+	}
+	removed = lru_deallocate(((HashTable) hashTable)->lru, currentList);
+	if (currentList == NULL) {
+		pthread_mutex_unlock(((HashTable) hashTable)->lru_lock);
+	}
+
+Acá Torvalds habla de esto mismo: https://lkml.org/lkml/2022/9/19/949.
+Al reducir el abarque del lock FIFO, ya no debería hacer falta esta
+lógica, pero no hace falta que la remuevan/limpien.
+
+Correccion: Al tomar el lock de la FIFO solo cuando es necesario, no 
+hay que manejar más el caso de deadlock donde el lock ya esta tomado
+
+- En lru_deallocate, el bucle termina con `temp = lru->rear`, no
+debería ser `temp = temp->backLRU`...? Así parece que no se mueve para
+ningún lado en el caso de que `currentListDeallocation` sea NULL. Otro
+comentario menor: traten de reducir la indentación, esto puede empezar
+con
+
+	if (lru->rear == NULL)
+		return false;
+
+y todo el resto baja un nivel. (Por otro lado este caso ni siquiera
+sirve de mucho porque el bucle ni arranca con `temp == NULL`.) Idem para
+usar un `continue` para el caso que se saltea.
+
+Correccion: Ahora el deallocate inicia borrando elementos desde el final,
+en caso de no poder tomar el lock de un elemento, pasa al siguiente "más antigüo"
+
+- En `lru_deallocate`, en general, no se espera ver que acomoden los
+punteros. Debería existir una función `unlink` o similar que se
+encargue de todo. La misma lógica está repetida en `take`.
+
+Correccion: Se abstrajo la logica de sacar un nodo de una lista y FIFO
+
+Puntos menores
+==============
+
+- En stats(), la copia no es atómica, así que si bien cada contador
+se mantiene correcto sin pisarse, puede ser que esta función tome una
+"foto" que no sea consistente con la realidad. Por ejemplo que desde un
+estado limpio se empiece a copiar, luego otro cliente empiece a agregar
+algo, y luego termine la copia, resultando algo como:
+
+  OK PUTS=0 DELS=0 GETS=0 TAKES=0 KEYS=1
+
+lo cual debería ser imposible. Es un detalle. Es algo totalmente
+aceptable para las estadísticas, pero esperaba ver un comentario.
+
+Correccion: Lo dejamos igual, ya que pensamos que no usar locks para las
+variables no traia muchos problemas
+
+- Falta detectar la cantidad de procesadores, ahora mismo la cantidad
+está fija en 6.
+
+Correccion: Ahora el servidor tiene n hilos (siendo n la cantidad de procesadores
+de la computadora) escuchando conexiones.
+
+- Al correr con sudo, getuid() devuelve la ID de root, así que
+setuid(getuid()) no hace nada. Idem grupos. Usen algun uid/gid fijo
+puesto en un header y listo. Aparte tengan en cuenta que el programa
+puede correrse sin usar sudo. Bueno, supongo que la idea era que esto
+funcione con sudo... no?
+
+Correccion: Se aplico la bien el uso de setuid/setgid para remover los
+privilegios de usuario
+
+- Hay que manejar la señal SIGPIPE, que se recibe cuando se escribe a un
+socket/pipe que fue cerrado. Sin eso, cualquier cliente que pida algo
+y cierre su conexión antes de leerlo hace que el server muera.
+
+	$ gdb ./server 
+	GNU gdb (Debian 12.1-4) 12.1
+	Copyright (C) 2022 Free Software Foundation, Inc.
+	License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+	This is free software: you are free to change and redistribute it.
+	There is NO WARRANTY, to the extent permitted by law.
+	Type "show copying" and "show warranty" for details.
+	This GDB was configured as "x86_64-linux-gnu".
+	Type "show configuration" for configuration details.
+	For bug reporting instructions, please see:
+	<https://www.gnu.org/software/gdb/bugs/>.
+	Find the GDB manual and other documentation resources online at:
+	    <http://www.gnu.org/software/gdb/documentation/>.
+
+	For help, type "help".
+	Type "apropos word" to search for commands related to "word"...
+	Reading symbols from ./server...
+	(gdb) run
+	Starting program: memcached-corregido/server 
+	[Thread debugging using libthread_db enabled]
+	Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
+	[New Thread 0x7ffff7d936c0 (LWP 63191)]
+	[New Thread 0x7ffff75926c0 (LWP 63192)]
+	[New Thread 0x7ffff6d916c0 (LWP 63193)]
+	[New Thread 0x7ffff65906c0 (LWP 63194)]
+	[New Thread 0x7ffff5d8f6c0 (LWP 63195)]
+
+	Thread 4 "server" received signal SIGPIPE, Broken pipe.
+	[Switching to Thread 0x7ffff6d916c0 (LWP 63193)]
+	__GI___libc_write (nbytes=4, buf=0x7fffec000b90, fd=6) at ../sysdeps/unix/sysv/linux/write.c:26
+	26	../sysdeps/unix/sysv/linux/write.c: No such file or directory.
+
+	make: *** [makefile:9: start] Broken pipe
+
+Correccion: Ahora se ignoral la señal para que no throwee el programa.
+
+- Para qué están los casos `if (table == NULL)` las funciones de la tabla?
+Parecen todos imposibles.
+
+Correccion: Sacamos esos ifs ya que no tenian mucho sentido en la implementación.
+
+- Alguna vez esto se llama con NULL...?
+
+	bool comparate_keys(void *data1, void *data2) {
+		if (data1 == NULL || data2 == NULL)	{
+			return false;
+		}
+
+En ambos puntos de arriba, si NO se espera que se pueda llamar con
+NULL, es _mucho_ mejor borrar las condiciones y dejar que el programa
+explote rápido si llega a ocurrir. Caso contrario puede quedar un bug
+escondido.
+
+Correccion: Sacamos ese if ya que no servian de nada.
+
+- En `create_hashtable` podrían haber matado al programa si algo falla,
+no hace falta liberar las cosas porque ya fue, sin la tabla no se puede
+hacer nada y el programa va a salir. (Aunque no está mal tener una impl
+reusable.) Por otro lado, no hace falta alocar un array de PUNTEROS a
+los locks: podrían alocar un _único_ arreglo de locks.
+
+  struct _HashTable {
+    ..
+    pthread_mutex_t *locks;
+    ..
+  }
+
+
+  table->locks = malloc(size * (sizeof table->locks[0]));
+  if (!table->locks) { ... }
+
+
+  pthread_mutex_lock(&table->locks[idx]);
+
+Esto también debería simplificar bastante la lógica para recuperarse
+de los fallos.
+
+Correccion: No nos habiamos dado cuenta, ahora los implementamos de esa forma.
+
+- "comparate" -> "compare"
+
+Correccion: ;)
+
+Cliente Erlang
+==============
+
+			- Faltan locks! La idea es que _una_ instancia de conexión a la
+			caché, es decir un resultado de start(), pueda usarse entre N procesos
+			erlang sin problema. Como está ahora, se van a mezclar los pedidos y
+			respuestas.
+
+Correccion:
+Ahora hay un proceso que se encarga de tomar los pedidos y es el unico que
+maneja el socket, de esta manera todos los clientes comparten esa instancia
+de conexion a la cache
+
+			- No encontré el problema con el test de erlang que contó Ulises en la
+			defensa, aunque no lo miré mucho, pero al correrlo siempre veo STATS
+			consistentes. Si lo encuentran avisen qué es por favor.
+
+Correccion:
+Dejo de ocurrir
+
+			- El de texto no hacía falta, pero: nada garantiza que los recv() vayan
+			a retornar una línea entera. Es fácil hacerlo perder la sincronía.
+
+				1> {ok,S} = cli_text:start().
+				{ok,#Port<0.6>}
+				2> cli_text:put(S, "a", "adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd").
+				{ok,"OK\n"}
+				3> cli_text:get(S, "a").
+				{ok,"OK adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd"}
+				4> cli_text:get(S, "a").
+				{ok,"\n"}
+				5> cli_text:get(S, "a").
+				{ok,"OK adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd\n"}
+				6> cli_text:get(S, "a").
+				{ok,"OK adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd\n"}
+				7> cli_text:get(S, "a").
+				{ok,"OK adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd\n"}
+				8> cli_text:get(S, "a").
+				{ok,"OK adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd\n"}
+				9> cli_text:stats(S).
+				{ok,"OK adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd\n"}
+				10> cli_text:stats(S).
+				{ok,"OK PUTS=2 DELS=0 TAKES=0 GETS=17 KEYS=1\n\n"}
+				11> cli_text:stats(S).
+				{ok,"OK PUTS=2 DELS=0 TAKES=0 GETS=17 KEYS=1\n\n"}
+				12> cli_text:get(S, "a").
+				{ok,"OK PUTS=2 DELS=0 TAKES=0 GETS=17 KEYS=1\n\n"}
+				13> cli_text:get(S, "a").
+				{ok,"OK adsadkjhakjdkaskjdjsdasdsadasdasdasdadasdasdaksjdasdadsadasd\n"}
+
+Correcion:
+Ahora se toman caracteres hasta encontrar un \n

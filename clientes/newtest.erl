@@ -1,4 +1,4 @@
--module(test).
+-module(newtest).
 -export([test/2, client/3, spawner/4]).
 -import(cli_bin, [put/3, del/2, get/2, take/2, stats/1, start/0, close/1]).
 %-import(cli_text, [put/3, del/2, get/2, take/2, stats/1, start/0, close/1]).
@@ -16,7 +16,6 @@ client(Port, N, FatherPid) ->
 	cli_bin:put(Port, N, N),
 	cli_bin:get(Port, N),
 	% cli_bin:del(Port, N), %Comentado para probar el deallocate
-	cli_bin:close(Port),
 	FatherPid ! ok.
 
 % client(Port, N, FatherPid) ->
@@ -30,6 +29,7 @@ client(Port, N, FatherPid) ->
 spawner(RemainingClients, TotalClients, Port, FatherPid) ->
 	case RemainingClients of			
 		0 -> recv(TotalClients),
+				 cli_bin:close(Port),
 				 FatherPid ! ok;
 		RemainingClients -> spawn(?MODULE, client, [Port, RemainingClients, self()]),
 												spawner(RemainingClients-1, TotalClients, Port, FatherPid)

@@ -211,13 +211,13 @@ bool binary_handler(int fd, struct bin_state *bin, Memcached table) {
 		bin->command = EMPTY;
 	} 
 	else if (bin->command == STATS) {
-		char* line = memcached_stats(table);
-		if(line != NULL){
+		char buffer[100];
+		memcached_stats(table, buffer);
+		if(buffer != NULL){
 			char code = OK;
 			write(fd, &code, 1);
-			send_length(fd, strlen(line));
-			write(fd, line, strlen(line));
-			free(line);
+			send_length(fd, strlen(buffer));
+			write(fd, buffer, strlen(buffer));
 		} else {
 			// Tuve un error, me olvido del comando
 			// y mando "error unknown"
@@ -291,9 +291,10 @@ bool text_handler(int fd, struct text_state *text, Memcached table) {
 	int rc;
 	while ((rc = get_input_commands(text, t)) != 0) {
 		if (strcmp(text->comm[0], "STATS") == 0 && text->wordsCount == 1) {
-			char* stats = memcached_stats(table);
+			char buffer[100];
+			memcached_stats(table, buffer);
 			write(fd, "OK ", 3);
-			write(fd, stats, strlen(stats));
+			write(fd, buffer, strlen(buffer));
 			write(fd, "\n", 1);
 		} 
 		else if (text->wordsCount > 1) {

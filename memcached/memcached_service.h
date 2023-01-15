@@ -23,7 +23,7 @@ void memcached_take(Memcached mc, void *key, unsigned keyLen, void **value, unsi
 
 int memcached_delete(Memcached mc, void *key, unsigned keyLen);
 
-char *memcached_stats(Memcached mc);
+void memcached_stats(Memcached mc, char *buffer);
 
 int memcached_destroy(Memcached mc);
 

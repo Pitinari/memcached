@@ -192,7 +192,6 @@ void hashtable_destroy(HashTable table) {
 
 // si existe el value cambia se lo asigna al puntero pasado como value, junto con su largo
 void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value, unsigned *valueLen) {
-	if (table == NULL) return;
 	unsigned hashedKey = hash_function(key, keyLen);
 	unsigned idx = hashedKey % table->size;
 	struct _NodeHT data = { key, keyLen, NULL, 0, hashedKey };
@@ -215,7 +214,6 @@ void hashtable_search(HashTable table, void *key, unsigned keyLen, void **value,
 }
 
 bool hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, unsigned valueLen) {
-	if (table == NULL) return false;
 	unsigned hashedKey = hash_function(key, keyLen);
 	unsigned idx = hashedKey % table->size;
 	NodeHT data = nodeht_create(table, key, keyLen, value, valueLen, hashedKey);
@@ -227,7 +225,6 @@ bool hashtable_insert(HashTable table, void *key, unsigned keyLen, void *value, 
 }
 
 void *hashtable_take(HashTable table, void *key, unsigned keyLen) {
-	if (table == NULL) return NULL;
 	unsigned hashedValue = hash_function(key, keyLen);
 	unsigned idx = hashedValue % table->size;
 	struct _NodeHT data = { key, keyLen, NULL, 0, hashedValue };
